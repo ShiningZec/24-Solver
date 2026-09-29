@@ -58,12 +58,16 @@ Wakusei/
         │       ├── values/styles.xml           # 键盘按键样式（20sp 字号等）
         │       ├── values/colors.xml           # rose / rose_checked / rose_disabled
         │       ├── color/button_rose_tint.xml  # 特殊键的玫红状态选择器
-        │       └── navigation / menu / values-* / drawable / mipmap / xml
+        │       ├── drawable/ic_launcher_background.xml  # 图标底层：玫红铺底
+        │       ├── drawable/ic_launcher_foreground.xml  # 图标标记：七段式 “24” + SOLVER
+        │       ├── mipmap-anydpi*、mipmap-*dpi/         # 自适应图标（API 26+）+ 早期密度位图
+        │       └── navigation / menu / values-* / xml
         ├── test/java/com/a24solver/wakusei/
         │   ├── SyntaxTreeTest.kt      # 求解器：命中 + 枚举不重不漏
         │   ├── RationalTest.kt        # 有理数运算
         │   ├── FirstFragmentTest.kt   # ★ 输入/结果界面的 Robolectric 测试（25 例）
         │   ├── AdsTest.kt             # 广告防护（3 例）
+        │   ├── IconTest.kt            # 图标资源与 66dp 安全区几何（3 例）
         │   └── ExampleUnitTest.kt
         └── androidTest/java/…         # 仪器测试（模板）
 ```
@@ -239,6 +243,7 @@ solveJob = viewLifecycleOwner.lifecycleScope.launch {
 | `SyntaxTreeTest` | `solveIt` 命中（含分数解）、三个枚举器不重不漏 | 8 |
 | `FirstFragmentTest` | 键盘布局/尺寸/配色、按键接线、拉杆与写回、CLEAR 点按与长按、DEL 长按、校验、后台求解与结果往返（Robolectric） | 25 |
 | `AdsTest` | app ID 声明、异常防护、初始化不抛 | 3 |
+| `IconTest` | 图标资源可解析（自适应图标 + 两层 drawable）、标记落在 66dp 安全圆内、两道标记不重叠 | 3 |
 | `ExampleUnitTest` | 模板用例 | 1 |
 
 ```bash
@@ -252,6 +257,8 @@ cd F:/code/Wakusei
 
 - Robolectric 需要 `testOptions.unitTests.isIncludeAndroidResources = true` 才能看到合并后的资源与 manifest。
 - Gradle 守护进程跑在 **JDK 25** 上，Robolectric 4.14.1 内置的 ASM 读不了 Java 25 平台类（`Unsupported class file major version 69`），因此单测任务被固定到本机 **JDK 21**；应用与测试字节码仍是 Java 11。
+- 每个 Robolectric 测试类都要写 `@Config(sdk = [34])`（Robolectric 4.14.1 不认识本项目的 `targetSdk 37`，缺了它整类会在 `DefaultSdkPicker` 直接初始化失败）。
+- Robolectric 无法真正栅格化 `VectorDrawable`（画进 `Canvas` 后再读 `Bitmap` 像素全是 0），所以图标外观用浏览器渲染同一份 pathData 校验，测试里只做资源与几何断言。
 
 `SyntaxTreeTest.kt:54-61` 里 `size = 6` 的用例仍被注释掉（约 1.2 亿次循环）。
 
