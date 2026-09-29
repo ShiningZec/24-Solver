@@ -2,4 +2,10 @@
 <resources>
     <color name="black">#FF000000</color>
     <color name="white">#FFFFFFFF</color>
+
+    <!-- Rose accent for the keypad's special keys ([+/-] [NEXT] [CLEAR] [TARGET] [DEL]).
+         Single place to tune the look; the tint selector is res/color/button_rose_tint.xml. -->
+    <color name="rose">#D81B60</color>          <!-- default / pressed -->
+    <color name="rose_checked">#AD1457</color>  <!-- TARGET latch active -->
+    <color name="rose_disabled">#E7A9BE</color> <!-- disabled keys -->
 </resources>

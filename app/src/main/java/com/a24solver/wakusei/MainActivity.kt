@@ -1,7 +1,7 @@
 package com.a24solver.wakusei
 
 import android.os.Bundle
-import com.google.android.material.snackbar.Snackbar
+//import com.google.android.material.snackbar.Snackbar // only used by the (commented out) FAB
 import androidx.appcompat.app.AppCompatActivity
 import androidx.activity.enableEdgeToEdge
 import androidx.core.view.ViewCompat
@@ -44,6 +44,11 @@ class MainActivity : AppCompatActivity() {
         super.onCreate(savedInstanceState)
         enableEdgeToEdge()
 
+        // The ads SDK is initialized defensively: see Ads — a failing ad SDK must never take the
+        // app down, and the launch crash of MobileAdsInitProvider is prevented by the
+        // APPLICATION_ID meta-data in AndroidManifest.xml rather than by code.
+        Ads.initialize(this)
+
         binding = ActivityMainBinding.inflate(layoutInflater)
         setContentView(binding.root)
 
@@ -61,11 +66,13 @@ class MainActivity : AppCompatActivity() {
         appBarConfiguration = AppBarConfiguration(navController.graph)
         setupActionBarWithNavController(navController, appBarConfiguration)
 
-        binding.fab.setOnClickListener { view ->
-            Snackbar.make(view, "Replace with your own action", Snackbar.LENGTH_LONG)
-                .setAction("Action", null)
-                .setAnchorView(R.id.fab).show()
-        }
+        // Floating action button: unused template hook, commented out together with the FAB
+        // itself in activity_main.xml.
+        // binding.fab.setOnClickListener { view ->
+        //     Snackbar.make(view, "Replace with your own action", Snackbar.LENGTH_LONG)
+        //         .setAction("Action", null)
+        //         .setAnchorView(R.id.fab).show()
+        // }
     }
 
     override fun onCreateOptionsMenu(menu: Menu): Boolean {

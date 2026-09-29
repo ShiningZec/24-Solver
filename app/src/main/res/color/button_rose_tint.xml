@@ -1,0 +1,8 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Background tint of the keypad's special keys ([+/-] [NEXT] [CLEAR] [TARGET] [DEL]):
+     rose by default, a deeper rose while the TARGET latch is on, faded when disabled. -->
+<selector xmlns:android="http://schemas.android.com/apk/res/android">
+    <item android:color="@color/rose_disabled" android:state_enabled="false" />
+    <item android:color="@color/rose_checked" android:state_checked="true" />
+    <item android:color="@color/rose" />
+</selector>
