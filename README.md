@@ -31,7 +31,14 @@
 结果的解不会因浮点误差被漏掉或误判。
 
 界面侧对输入有更严格的限制（见 §3.3）：**候选数最多 5 个**、`|候选数| < 256`（严格小于，与求解器
-的 `require` 一致）、`|target| ≤ 16384`。
+的 `require` 一致）、`|target| ≤ 16384`。目标值的**默认值**可以在设置里改（见 §3.9）。
+
+界面之外，这一版还带着三件与求解无关、但与「能不能用」有关的东西：
+
+- **按键音效**：十五个按键各发一个木琴音（八个音洗牌轮转），`SOLVE` 与长按手势发音阶；全部是
+  运行时**自己合成**的 PCM，不含任何外部音频素材或授权（见 §3.8）。
+- **三语界面**：中文 / English / 日本語，英文为默认与 fallback，可在设置里实时切换（见 §3.9）。
+- **设置页**：标题栏右上角的三横线按钮进入，含语言、默认目标数、按键音效开关（见 §3.9）。
 
 ### 1.2 目录结构
 
@@ -53,13 +60,21 @@ Wakusei/
         │   │   │   ├── Rational.kt        # ★ 精确有理数（BigInteger，构造即最简）
         │   │   │   ├── Expression.kt      # ★ 表达式树：求值 / 打印 / 规范形 key
         │   │   │   └── Solver.kt          # ★ 子集 DP、内存预算、两种解集
+        │   │   ├── sound/                 # ★ 按键音效（见 §3.8）
+        │   │   │   ├── Pitch.kt           # 音高与频率（十二平均律）
+        │   │   │   ├── Melodies.kt        # 8 音洗牌队列 + 两条音阶
+        │   │   │   ├── ToneSynthesizer.kt # ★ 纯函数：把音高合成成 PCM 波形
+        │   │   │   ├── ToneEngine.kt      # 后台线程播放 + AudioTrack 输出（可注入 sink）
+        │   │   │   └── SoundEffects.kt    # 门面：playKeypadTone / playSolveScale / playResetScale
+        │   │   ├── settings/Settings.kt   # ★ 设置存储（语言 / 默认目标 / 音效开关）
         │   │   ├── FirstFragment.kt       # ★ 输入界面：键盘、校验、后台求解、状态恢复
         │   │   ├── SecondFragment.kt      # ★ 结果界面：答案列表 + 全部/本质不同切换
+        │   │   ├── SettingsFragment.kt    # ★ 设置界面（见 §3.9）
         │   │   ├── SolveResultViewModel.kt# 两个界面之间共享的解集与显示选择
         │   │   ├── Ads.kt                 # 广告 SDK 的异常防护层
-        │   │   └── MainActivity.kt        # 壳：NavHost + 40dp 顶栏
+        │   │   └── MainActivity.kt        # 壳：NavHost + 40dp 顶栏 + 设置按钮
         │   ├── keepRules/rules.keep       # R8 保留规则（模板，当前 release 未开启 R8）
-        │   └── res/                       # values（英文）/ values-zh（中文）/ layout / ...
+        │   └── res/                       # values（英文）/ values-zh / values-ja / layout / xml / ...
         ├── test/java/com/a24solver/wakusei/
         │   ├── solver/
         │   │   ├── RationalTest.kt        # 有理数：规范化、四则、比较、不溢出
@@ -68,9 +83,14 @@ Wakusei/
         │   │   ├── SolverPurityTest.kt    # 断言 solver 包不引用 android/androidx
         │   │   ├── BruteForceOracle.kt    # ★ 测试用的独立暴力枚举（差分基准）
         │   │   └── ExpressionParser.kt    # ★ 测试用的独立解析器（验证打印可往返）
+        │   ├── sound/                     # ★ 波形（长度/峰值/衰减/频率）、洗牌队列、引擎不阻塞
         │   ├── FirstFragmentTest.kt       # Robolectric：键盘、拉杆、手势、校验、结果往返
+        │   ├── KeypadSoundTest.kt         # ★ Robolectric：哪些按键发哪个音、关掉后是否真的静音
+        │   ├── SettingsFragmentTest.kt    # ★ Robolectric：语言 / 默认目标 / 音效开关的行为
+        │   ├── DefaultTargetTest.kt       # ★ 默认目标从哪来、设置按钮与返回行为
         │   ├── BottomControlsTest.kt      # Robolectric：系统栏 insets 与底部按钮不被导航栏遮挡
         │   ├── SolveResultViewModelTest.kt# 结果界面的显示规则与选择保持
+        │   ├── settings/SettingsTest.kt   # 设置存储：默认值、持久化、校验
         │   ├── AdsTest.kt                 # 广告防护
         │   └── IconTest.kt                # 图标资源与 66dp 安全区几何
         └── androidTest/java/…/LaunchSmokeTest.kt   # 真机冒烟：应用能启动（见 §4.3）
@@ -94,9 +114,12 @@ Wakusei/
 | 结果界面：答案列表、全部/本质不同切换、`BACK` | ✅ 实现并有测试 |
 | 长按手势：`CLEAR` 全部复位、`DEL` 撤销最后一个候选数（系统级轻振动） | ✅ 实现并有测试 |
 | 旋转 / 配置变更后输入不丢失 | ✅ 实现并有测试 |
-| 中文界面（`values-zh`） | ✅ 实现（英文为默认） |
+| 按键音效：15 键洗牌轮转 8 音、`SOLVE` 与长按的音阶、后台播放不阻塞界面 | ✅ 实现并有测试（见 §3.8） |
+| 三语界面：中文 / English / 日本語，英文为默认与 fallback，可实时切换 | ✅ 实现并有测试（见 §3.9） |
+| 设置页：语言、默认目标数（滑杆节点 + 自定义输入）、音效总开关 | ✅ 实现并有测试（见 §3.9） |
 | 广告 SDK 的异常防护 + 启动崩溃的配置修复 | ✅ 实现并有测试（见 §3.7） |
 | 真机 / 模拟器仪器测试 | ⚠️ 只有启动冒烟测试（见 §4.3），本机无设备可跑 |
+| 真机上听感调校（音量、音色、音符时长） | ⚠️ 参数是按听感选的理论值，未在真机上听过 |
 | n ≥ 6 的完全枚举 | ❌ 解空间本身过大，求解器会**快速报错**而不是卡死（见 §5.2） |
 | 答案列表换成 `RecyclerView` | ❌ 仍是单个可选中 `TextView`（见 §5.3） |
 | detekt / ktlint | ❌ 只跑 Android Lint |
@@ -381,6 +404,57 @@ ViewCompat.setOnApplyWindowInsetsListener(binding.main) { view, insets ->
   `MainActivity.onCreate` 用 **applicationContext** 调用一次（不持有 Activity 引用）；
 - `AdsTest` 断言该 meta-data 存在且形态正确（`ca-app-pub-…~…`）。
 
+### 3.8 按键音效
+
+**全部是运行时合成的**（`sound/ToneSynthesizer.kt`）：基频 + 两个高次模式（真实音条大约调在
+基频的 4 倍与 10 倍上，高次模式衰减更快）叠上瞬态击发与指数衰减包络，直接算出 PCM。项目里
+**没有任何音频文件**，所以既不存在采样素材的授权问题，APK 也不会因此变大。
+
+| 触发 | 声音 |
+| --- | --- |
+| 第一页 15 个键（`0-9` `[+/-]` `NEXT` `CLEAR` `DEL` `TARGET`） | 从 **C, D, E, F#, G, A, Bb, C5** 里取一个 |
+| `SOLVE` | 六音音阶 **C, Eb, F#, G, Bb, B**（依次奏出） |
+| 长按 `CLEAR` / 长按 `DEL` | 三音音阶 **E, G#, C5**（依次奏出） |
+| 第二页的所有按钮、标题栏按钮 | 不发声 |
+
+- 那 15 个键共用**一个洗牌袋**（`NoteQueue`）：八个音各响一次之前不会重复，响完自动重洗，
+  所以连按一串键听起来是一条走遍八度的旋律，而不是同一个音反复敲。`KeypadSoundTest` 会把这
+  15 个键全部按一遍，再逐段比对波形，确认前八个音**正好是八个不同的音高**。
+- 「不阻碍主进程」是设计的一部分：`ToneEngine.play()` 只把工作丢给一个后台工作线程就返回
+  （单线程、队列只保留最新几段音频，连按不会越拖越久）；`ToneEngineTest` 用一个每次睡 400ms
+  的假 sink 证明调用方在 100ms 内返回。
+- 失败一律吞掉：没有可用音频设备时按键照常工作，只是没声音。
+- 音量走**媒体**流（`USAGE_MEDIA`），因此受媒体音量与勿扰控制；静音模式下的表现取决于系统设置
+  （见 §5.3）。
+- 一个总开关在设置页（§3.9），默认打开。
+
+### 3.9 设置页与语言
+
+标题栏**最右**是一个三横线按钮（`drawable/ic_menu.xml`，`android:tint="?attr/colorOnSurface"`，
+即跟随主题前景色：浅色主题下是深色、深色主题下是浅色）。点它**直接进入设置页**，两个界面都能进；
+已经在设置页时再点不会叠出第二份（`MainActivity` 里做了目的地判断）。设置页是导航图里的第三个
+目的地，所以返回箭头会自动出现，并且**回到打开它的那个界面**。
+
+设置页三项：
+
+| 项 | 行为 |
+| --- | --- |
+| **语言** | 下拉框：跟随系统 / 中文 / English / 日本語；选中立刻生效并存档 |
+| **默认目标数** | 滑杆 7 个节点：`CUSTOMIZE`、`-24`、`-10`、`0`、`10`、`24`、`60`；选 `CUSTOMIZE` 时启用下方数字输入 |
+| **按键音效** | 总开关，默认开 |
+
+- 语言用 `AppCompatDelegate.setApplicationLocales`（AppCompat 1.6+ 的 per-app language）：
+  切换会立刻重建界面，用户选的语言由系统（API 33+）或 AppCompat 的 auto-store 服务持久化
+  —— 后者需要在 manifest 里声明 `AppLocalesMetadataHolderService`，已经加上；API 33+ 还通过
+  `android:localeConfig` 把这三个语言暴露给系统的「按应用设置语言」。
+  三套字符串必须齐全（英文在 `values/`，是默认与 fallback），**漏翻会直接让 lint 失败**。
+- 默认目标数用「预设节点 + 数字输入」的组合：预设节点覆盖常用值，其中两个是负数——这就是让用户
+  **立刻看到目标可以是负数**的方式；`CUSTOMIZE` 是进入数字输入的开关（选中前输入框是禁用的）。
+  输入按 ±16384 校验（与目标输入同一规则），非法值只在输入框上报错、**不写进设置**；空字符串
+  在编辑过程中不算错误（失焦才提示）。
+- 设置**不会改动当前正在使用的目标值**：它只决定「新开的界面从哪开始」和「长按 CLEAR 回到哪」。
+  `DefaultTargetTest` 用两条测试分别钉住了这两件事，以及「改了设置不碰当前目标」。
+
 ---
 
 ## 4. 测试与构建
@@ -394,20 +468,28 @@ ViewCompat.setOnApplyWindowInsetsListener(binding.main) { view, insets ->
 | `SolverTest` | 解数（独立验证）、每个解真的等于目标且每个数用一次、去重与排序、本质解每类一条、与暴力枚举差分、预算与输入校验 | 15 |
 | `SolverPurityTest` | `solver` 包编译产物不引用 `android`/`androidx` | 1 |
 | `FirstFragmentTest` | 键盘布局/尺寸/配色、按键接线、拉杆与写回、CLEAR 点按与长按、DEL 长按、校验、后台求解与结果往返、全部/本质切换及其旋转保持、旋转不丢输入（Robolectric） | 29 |
+| `KeypadSoundTest` | 15 个键各发一个音、前八个音正好是八个不同音高、`SOLVE`/长按的音阶逐段比对波形、第二页与切换按钮不发声、关掉开关后彻底静音（Robolectric + 假 sink） | 9 |
+| `SettingsFragmentTest` | 语言下拉的四项与切换、预设节点、`CUSTOMIZE` 启用输入、非法值只报错不落盘、空值不算错、音效开关、回显已存值（Robolectric） | 12 |
+| `DefaultTargetTest` | 新界面从默认目标开始、长按 CLEAR 回到默认目标、改设置不影响当前目标、设置按钮进入设置页/不叠加/返回原界面 | 7 |
+| `settings.SettingsTest` | 默认值、预设节点取值、`CUSTOMIZE` 与自定义值、±16384 校验、持久化、语言标签映射 | 7 |
+| `sound.ToneSynthesizerTest` | 长度、峰值不削波、衰减、起始无爆音、**自相关测出基频与音高一致**、静音、音阶拼接 | 9 |
+| `sound.NoteQueueTest` | 八音用完才重复、每轮重洗、`reset`、空队列被拒 | 5 |
+| `sound.ToneEngineTest` | 一段音阶一次写入、每次调用都发声、**play() 不阻塞调用方**、音频设备失败被吞、shutdown 释放 | 5 |
+| `sound.MelodiesTest` | 三个音列与需求逐音对齐、音高符合十二平均律 | 4 |
 | `SolveResultViewModelTest` | 显示哪一份解集、两组相同时回落到「全部」、选择随 ViewModel 保留 | 4 |
 | `BottomControlsTest` | 系统栏 insets 真的被应用到根视图、布局没有重复 fit、`SOLVE` / `BACK` 落在导航栏之上且留有底部余量（Robolectric 里派发合成 insets） | 4 |
 | `AdsTest` | app ID 声明、异常防护、初始化不抛 | 3 |
 | `IconTest` | 图标资源可解析（自适应图标 + 两层 drawable）、标记落在 66dp 安全圆内、两道标记不重叠 | 3 |
 | `LaunchSmokeTest`（androidTest） | 应用能在真机上启动并显示输入界面 | 1 |
 
-单元测试共 **73** 例。
+单元测试共 **131** 例。
 
 ### 4.2 构建与测试命令
 
 ```bash
 cd F:/code/Wakusei
-./gradlew.bat :app:testDebugUnitTest   # 全部单元测试（73 例，约 25 s）
-./gradlew.bat :app:lintDebug           # Android Lint（当前应无 error）
+./gradlew.bat :app:testDebugUnitTest   # 全部单元测试（131 例，约 40 s）
+./gradlew.bat :app:lintDebug           # Android Lint（当前应无 error / warning）
 ./gradlew.bat :app:assembleDebug       # 打 debug APK
 ./gradlew.bat :app:assembleDebugAndroidTest   # 编译仪器测试
 ./gradlew.bat :app:connectedDebugAndroidTest  # 需要真机/模拟器
@@ -467,8 +549,15 @@ n=8 是 1.1×10^12。**这是输出本身的规模**，换算法也救不了—�
 - 长按阈值固定为系统默认 500 ms，尚不可配置（P2 TODO）。
 - 答案列表是单个可选中 `TextView` + `ScrollView`（未引入 RecyclerView）；解数上千时（5 个数字
   可能有两千多条）会明显吃内存与滚动性能。
-- 界面文案英文为默认、中文在 `values-zh`；其它语言回落到英文。
 - 求解与结果界面之间用 ViewModel 传数据，进程被杀后结果页会显示空状态（符合预期，但不会自动重算）。
+- **音效参数没有在真机上听过**：音符时长（按键 450ms、音阶 200ms+80ms 间隔）、三个模式的相对
+  强度与衰减都是按听感估的理论值，可能需要按实际设备调。音效走**媒体**流，所以「静音模式」下
+  是否发声取决于系统对该流的处理；如果需要「跟着铃声静音一起静音」，应改用
+  `USAGE_ASSISTANCE_SONIFICATION`（一行改动）。
+- 音效是**单声部**的：一次只有一段音频（新的会打断旧的，队列也只保留最新几段），快速连按不会
+  出现和弦，也不会越拖越滞后。
+- 界面文案中文、日文由我撰写，**没有母语者校对**；三套字符串的**完整性**由 lint 保证（漏翻即失败），
+  但用词是否地道无法自动验证。
 
 ### 5.4 「本质不同」的定义边界
 
@@ -511,7 +600,7 @@ n=8 是 1.1×10^12。**这是输出本身的规模**，换算法也救不了—�
 - [x] 统一 256 边界为严格小于（与求解器一致）
 - [x] 允许负数输入（`[+/-]`）
 
-### P1 —— 让「全部解」这个目标站得住（已完成本轮）
+### P1 —— 让「全部解」这个目标站得住（已完成）
 
 - [x] **明确「本质不同」的定义**并实现：`+`/`*` 的交换律 + 结合律归一（§2.3），
       `1,2,3,4 → 24` 从 242 条降到 28 条
@@ -523,17 +612,31 @@ n=8 是 1.1×10^12。**这是输出本身的规模**，换算法也救不了—�
 - [x] 补「每个解真的等于 target，且每个数恰好用一次」的验证型测试
 - [x] 补与独立暴力枚举的差分测试（随机 n ≤ 5）
 - [x] 内存预算：宁可快速报错，也不 OOM 或假死（§2.5）
+- [x] 底部按钮不再被导航栏遮挡（显式应用系统栏 insets + 一个按钮高的余量，§3.6）
+
+### P1.5 —— 这一版新增（已完成）
+
+- [x] 按键音效：15 键洗牌轮转 8 音、`SOLVE` 与长按的音阶、**运行时合成 PCM**（零素材、零授权）、
+      后台播放不阻塞界面、默认开启（§3.8）
+- [x] 三语界面：中文 / English / 日本語，英文为默认与 fallback（`values-ja` 新增）
+- [x] 语言实时切换：跟随系统 / 中文 / EN / JP，per-app language + 持久化（§3.9）
+- [x] 设置页与标题栏三横线入口（跟随主题前景色），两个界面都能进（§3.9）
+- [x] 默认目标数：滑杆节点 + `CUSTOMIZE` 数字输入，影响初始化与长按 CLEAR，不动当前目标（§3.9）
+- [x] 音效总开关（§3.9）
 
 ### P2 —— 工程与体验（未完成）
 
-- [ ] **让长按阈值 `x` 可配置**（当前固定为系统默认 500 ms），`CLEAR` 与 `DEL` 共用同一来源
+- [ ] **在真机上听一遍音效并调参**（音量、音色、音符时长），确认媒体流是否符合预期（§5.3）
+- [ ] 让长按阈值 `x` 可配置（当前固定为系统默认 500 ms），`CLEAR` 与 `DEL` 共用同一来源
+- [ ] 请母语者校对中文/日文文案（完整性已由 lint 保证，用词没有）
 - [ ] 答案列表换成 `RecyclerView`（现在解数上千时是单个 TextView）
 - [ ] 把 `solver/` 抽成纯 Kotlin JVM 模块（`SolverPurityTest` 已守住依赖边界）
 - [ ] 广告：把 `admob_app_id` 换成真实 ID，或确定不做广告后移除依赖 + meta-data + `Ads.kt`
 - [ ] 打开 release 的 R8（`optimization.enable = true`）+ 两个 Fragment 的 keep 规则（已写在
       `app/src/main/keepRules/rules.keep` 里），并在真机上冒烟验证
 - [ ] 探索 Robolectric 对新 SDK 的支持，去掉每个测试类上的 `@Config(sdk = [34])`
-- [ ] 加 `values-zh-rTW` / 其它语言；把 `TUTORIAL.md` 也翻成中文
+- [ ] 再加语言（`values-zh-rTW` 等）；把 `TUTORIAL.md` 也翻成中文/日文
+- [ ] 音效增强：多声部、每键音量、可选音色
 - [ ] 配置 detekt / ktlint，并把 lint 的 warning 也纳入 CI 门槛
 - [ ] 在 CI 上加一个（可选、手动触发的）模拟器 job 跑 `connectedDebugAndroidTest`
 - [ ] 交互增强：允许「不用完所有数字」的变体模式、更多运算符（一元负号、`!`、拼接）
