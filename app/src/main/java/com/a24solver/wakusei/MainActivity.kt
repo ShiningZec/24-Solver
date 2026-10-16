@@ -1,10 +1,13 @@
 package com.a24solver.wakusei
 
 import android.os.Bundle
+import android.view.Menu
+import android.view.MenuItem
 import androidx.appcompat.app.AppCompatActivity
 import androidx.activity.enableEdgeToEdge
 import androidx.core.view.ViewCompat
 import androidx.core.view.WindowInsetsCompat
+import androidx.navigation.NavController
 import androidx.navigation.fragment.NavHostFragment
 import androidx.navigation.ui.AppBarConfiguration
 import androidx.navigation.ui.navigateUp
@@ -69,18 +72,31 @@ class MainActivity : AppCompatActivity() {
 
         setSupportActionBar(binding.toolbar)
 
-        val navHostFragment =
-            supportFragmentManager.findFragmentById(R.id.nav_host_fragment_content_main) as NavHostFragment
-        val navController = navHostFragment.navController
-
         appBarConfiguration = AppBarConfiguration(navController.graph)
         setupActionBarWithNavController(navController, appBarConfiguration)
     }
 
-    override fun onSupportNavigateUp(): Boolean {
-        val navHostFragment =
-            supportFragmentManager.findFragmentById(R.id.nav_host_fragment_content_main) as NavHostFragment
-        return navHostFragment.navController.navigateUp(appBarConfiguration)
-                || super.onSupportNavigateUp()
+    /** The three-line button at the right end of the toolbar opens the settings screen. */
+    override fun onCreateOptionsMenu(menu: Menu): Boolean {
+        menuInflater.inflate(R.menu.menu_main, menu)
+        return true
     }
+
+    override fun onOptionsItemSelected(item: MenuItem): Boolean = when (item.itemId) {
+        R.id.action_settings -> {
+            // Guard against pushing a second copy of the screen when the button is already there
+            if (navController.currentDestination?.id != R.id.SettingsFragment) {
+                navController.navigate(R.id.SettingsFragment)
+            }
+            true
+        }
+        else -> super.onOptionsItemSelected(item)
+    }
+
+    override fun onSupportNavigateUp(): Boolean =
+        navController.navigateUp(appBarConfiguration) || super.onSupportNavigateUp()
+
+    private val navController: NavController
+        get() = (supportFragmentManager
+            .findFragmentById(R.id.nav_host_fragment_content_main) as NavHostFragment).navController
 }

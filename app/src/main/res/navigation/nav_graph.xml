@@ -25,4 +25,12 @@
             android:id="@+id/action_SecondFragment_to_FirstFragment"
             app:destination="@id/FirstFragment" />
     </fragment>
+
+    <!-- Reached from the toolbar button on either screen, so it is a sibling of both rather than
+         the target of one particular action; the up arrow returns to wherever it was opened from. -->
+    <fragment
+        android:id="@+id/SettingsFragment"
+        android:name="com.a24solver.wakusei.SettingsFragment"
+        android:label="@string/settings_fragment_label"
+        tools:layout="@layout/fragment_settings" />
 </navigation>

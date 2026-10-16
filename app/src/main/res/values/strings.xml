@@ -4,6 +4,7 @@
     <!-- Labels shown in the action bar by the navigation graph -->
     <string name="first_fragment_label">24 Solver</string>
     <string name="second_fragment_label">Answers</string>
+    <string name="settings_fragment_label">Settings</string>
 
     <!-- Input screen: labels applied by FirstFragment.refreshDisplay() -->
     <!-- e.g. "TARGET: 24" -->
@@ -74,4 +75,29 @@
     <!-- The switch between every expression and one per equivalence class -->
     <string name="result_toggle_all">All (%1$d)</string>
     <string name="result_toggle_essential">Essential (%1$d)</string>
+
+    <!-- Settings -->
+    <!-- The toolbar button that opens the settings screen (also its content description). -->
+    <string name="settings_open">Settings</string>
+    <string name="settings_language_title">Language</string>
+    <string name="settings_language_helper">Takes effect immediately.</string>
+    <!-- "Follow the system language". The three languages below are named in their own language
+         and are therefore not translated. -->
+    <string name="language_system">Follow system</string>
+    <string name="language_chinese" translatable="false">中文</string>
+    <string name="language_english" translatable="false">English</string>
+    <string name="language_japanese" translatable="false">日本語</string>
+
+    <string name="settings_default_target_title">Default target</string>
+    <string name="settings_default_target_current">Current: %1$s</string>
+    <!-- The slider node that hands the value over to the number field below. -->
+    <string name="default_target_customize" translatable="false">CUSTOMIZE</string>
+    <string name="settings_default_target_value">%1$d</string>
+    <string name="settings_default_target_hint">Custom default target</string>
+    <string name="settings_default_target_helper">A whole number within ±%1$d. Used when the screen opens and after a long press on CLEAR; it never changes the target in use.</string>
+    <string name="err_default_target_not_a_number">Enter a whole number</string>
+    <string name="err_default_target_range">Must be within ±%1$d</string>
+
+    <string name="settings_sound_title">Keypad sound</string>
+    <string name="settings_sound_helper">Plays a note when a keypad key is pressed. Off silences the keypad, SOLVE and the long-press gestures.</string>
 </resources>

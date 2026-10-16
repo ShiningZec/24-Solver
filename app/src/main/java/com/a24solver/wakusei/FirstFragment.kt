@@ -13,8 +13,10 @@ import androidx.fragment.app.activityViewModels
 import androidx.lifecycle.lifecycleScope
 import androidx.navigation.fragment.findNavController
 import com.a24solver.wakusei.databinding.FragmentFirstBinding
+import com.a24solver.wakusei.settings.Settings
 import com.a24solver.wakusei.solver.SolveOutcome
 import com.a24solver.wakusei.solver.Solver
+import com.a24solver.wakusei.sound.SoundEffects
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.launch
@@ -42,8 +44,16 @@ class FirstFragment : Fragment() {
 
     private val resultViewModel: SolveResultViewModel by activityViewModels()
 
+    private val settings by lazy { Settings(requireContext()) }
+
     /** What the target label currently shows. */
     private enum class TargetLabel { TARGET, SOLVING }
+
+    /**
+     * The sounds the input screen makes. Which control plays what is decided at each listener (see
+     * [setupButtons]); this only names the three gestures.
+     */
+    private enum class KeySound { TONE, SOLVE, RESET }
 
     private val numbers = mutableListOf<Int>()
 
@@ -175,6 +185,7 @@ class FirstFragment : Fragment() {
      */
     private fun onTargetToggled(active: Boolean) {
         if (restoringTargetLatch) return
+        playSound(KeySound.TONE)
 
         if (active) {
             targetEditing = true
@@ -208,7 +219,7 @@ class FirstFragment : Fragment() {
     }
 
     private fun resetTarget() {
-        target = DEFAULT_TARGET
+        target = settings.defaultTarget
         targetInput = "" // the label carries the value; the buffer is only what is being typed
     }
 
@@ -373,7 +384,8 @@ class FirstFragment : Fragment() {
     // -------------------------------------------------------------- wiring
 
     private fun setupButtons() {
-        // Table driven, so a key and the digit it produces cannot drift apart.
+        // Table driven, so a key and the digit it produces cannot drift apart. All ten digits are
+        // keypad-tone keys.
         val digitButtons: Map<Button, Int> = mapOf(
             binding.button0 to 0,
             binding.button1 to 1,
@@ -387,29 +399,68 @@ class FirstFragment : Fragment() {
             binding.button9 to 9
         )
         digitButtons.forEach { (button, digit) ->
-            button.setOnClickListener { onDigitPressed(digit) }
+            button.setOnClickListener {
+                onDigitPressed(digit)
+                playSound(KeySound.TONE)
+            }
         }
 
-        binding.buttonSign.setOnClickListener { onSignPressed() }
-
-        binding.buttonDel.setOnClickListener { onDeletePressed() }
-        binding.buttonDel.setOnLongClickListener {
-            onDeleteLongPressed()
-            true
+        // The other five tone keys: [+/-], NEXT, CLEAR, DEL, TARGET — fifteen in all. Their long
+        // presses play the reset arpeggio instead, and never a tone as well.
+        binding.buttonSign.setOnClickListener {
+            onSignPressed()
+            playSound(KeySound.TONE)
         }
 
-        binding.buttonClear.setOnClickListener { onClearPressed() }
+        binding.buttonNext.setOnClickListener {
+            onNextPressed()
+            playSound(KeySound.TONE)
+        }
+
+        binding.buttonClear.setOnClickListener {
+            onClearPressed()
+            playSound(KeySound.TONE)
+        }
         binding.buttonClear.setOnLongClickListener {
             onClearLongPressed()
+            playSound(KeySound.RESET)
             true
         }
 
-        binding.buttonNext.setOnClickListener { onNextPressed() }
-        binding.buttonSolve.setOnClickListener { onSolvePressed() }
+        binding.buttonDel.setOnClickListener {
+            onDeletePressed()
+            playSound(KeySound.TONE)
+        }
+        binding.buttonDel.setOnLongClickListener {
+            onDeleteLongPressed()
+            playSound(KeySound.RESET)
+            true
+        }
 
-        // checkable MaterialButton: the widget toggles itself, the listener only follows it
+        // SOLVE is the one key that plays a phrase rather than a single note.
+        binding.buttonSolve.setOnClickListener {
+            onSolvePressed()
+            playSound(KeySound.SOLVE)
+        }
+
+        // checkable MaterialButton: the widget toggles itself, the listener only follows it — and
+        // that is also where the latch's tone comes from, so restoring it stays silent.
         binding.buttonTarget.addOnCheckedChangeListener { _, isChecked ->
             onTargetToggled(isChecked)
+        }
+    }
+
+    /**
+     * Plays the sound a control makes, unless the user turned keypad sound off in the settings.
+     *
+     * Playback itself is asynchronous (see `SoundEffects`), so this never delays the key press.
+     */
+    private fun playSound(sound: KeySound) {
+        if (!settings.soundEnabled) return
+        when (sound) {
+            KeySound.TONE -> SoundEffects.playKeypadTone()
+            KeySound.SOLVE -> SoundEffects.playSolveScale()
+            KeySound.RESET -> SoundEffects.playResetScale()
         }
     }
 
@@ -429,7 +480,12 @@ class FirstFragment : Fragment() {
         super.onViewCreated(view, savedInstanceState)
 
         setupButtons()
-        if (savedInstanceState != null) restoreInput(savedInstanceState)
+        if (savedInstanceState != null) {
+            restoreInput(savedInstanceState)
+        } else {
+            // a fresh screen starts on the configured default target
+            target = settings.defaultTarget
+        }
         refreshDisplay()
     }
 
@@ -483,9 +539,12 @@ class FirstFragment : Fragment() {
 
         /** Strict upper bound: a candidate must satisfy `|x| < MAX_ABS_NUMBER`. */
         const val MAX_ABS_NUMBER = 256
-        const val MAX_ABS_TARGET = 16384
 
-        const val DEFAULT_TARGET = 24
+        /** The target bound, shared with the settings screen that configures the default. */
+        const val MAX_ABS_TARGET = Settings.MAX_ABS_TARGET
+
+        /** What a fresh screen starts on until the user configures something else. */
+        const val DEFAULT_TARGET = Settings.DEFAULT_TARGET
 
         /** Longest digit string a buffer accepts. */
         private const val MAX_DIGITS = 6

@@ -1,0 +1,67 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- Japanese. Does not redeclare app_name, the digit labels or the other
+         translatable="false" strings: those live in values/strings.xml only. -->
+    <string name="first_fragment_label">24 Solver</string>
+    <string name="second_fragment_label">答え</string>
+    <string name="settings_fragment_label">設定</string>
+
+    <!-- Input screen -->
+    <string name="target_label">目標: %1$d</string>
+    <string name="solving">計算中…</string>
+    <string name="numbers_label">数字: %1$s</string>
+    <string name="numbers_empty">（なし）</string>
+    <string name="current_input_label">入力: %1$s</string>
+    <string name="target_input_label">目標の入力: %1$s</string>
+    <string name="input_empty">_</string>
+
+    <!-- Buttons -->
+    <string name="btn_next">確定</string>
+    <string name="btn_target">目標</string>
+    <string name="btn_solve">計算</string>
+    <string name="btn_clear">クリア</string>
+    <string name="btn_del">削除</string>
+    <string name="btn_sign">+/−</string>
+    <string name="btn_back">戻る</string>
+
+    <!-- Hints / errors -->
+    <string name="msg_cleared_all">すべて初期値に戻しました</string>
+    <string name="err_empty_input">先に数字を入力してください</string>
+    <string name="err_no_numbers">計算の前に数字を1つ以上追加してください（入力して「確定」）</string>
+    <!-- 日本語では単数・複数の区別がないため other のみ -->
+    <plurals name="err_max_numbers">
+        <item quantity="other">候補にできる数字は最大 %1$d 個です</item>
+    </plurals>
+    <string name="err_number_range">各候補は |x| &lt; %1$d を満たす必要があります</string>
+    <string name="err_target_range">目標値は ±%1$d の範囲で指定してください</string>
+    <string name="err_solver">ソルバーが入力を拒否しました: %1$s</string>
+
+    <!-- Result screen -->
+    <plurals name="result_header">
+        <item quantity="other">目標 %2$d（%3$s から）の答えは %1$d 件</item>
+    </plurals>
+    <plurals name="result_header_essential">
+        <item quantity="other">目標 %2$d（%3$s から）の本質的に異なる答えは %1$d 件</item>
+    </plurals>
+    <string name="result_line">%1$d. %2$s</string>
+    <string name="result_empty">この数字では目標値になる式がありません。</string>
+    <string name="result_toggle_all">すべて（%1$d）</string>
+    <string name="result_toggle_essential">本質的（%1$d）</string>
+
+    <!-- Settings -->
+    <string name="settings_open">設定</string>
+    <string name="settings_language_title">言語</string>
+    <string name="settings_language_helper">すぐに反映されます。</string>
+    <string name="language_system">システムに従う</string>
+
+    <string name="settings_default_target_title">既定の目標値</string>
+    <string name="settings_default_target_current">現在: %1$s</string>
+    <string name="settings_default_target_value">%1$d</string>
+    <string name="settings_default_target_hint">カスタムの既定値</string>
+    <string name="settings_default_target_helper">±%1$d 以内の整数。画面を開いたときと「クリア」長押しのあとに使われ、使用中の目標値は変更しません。</string>
+    <string name="err_default_target_not_a_number">整数を入力してください</string>
+    <string name="err_default_target_range">±%1$d の範囲で入力してください</string>
+
+    <string name="settings_sound_title">キーパッドの音</string>
+    <string name="settings_sound_helper">キーを押すと音が鳴ります。オフにするとキーパッド・計算・長押しの音がすべて消えます。</string>
+</resources>

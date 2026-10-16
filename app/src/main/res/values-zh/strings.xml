@@ -4,6 +4,7 @@
          name, not a label that needs a translation. -->
     <string name="first_fragment_label">24 Solver</string>
     <string name="second_fragment_label">答案</string>
+    <string name="settings_fragment_label">设置</string>
 
     <!-- Input screen -->
     <string name="target_label">目标：%1$d</string>
@@ -46,4 +47,21 @@
     <string name="result_empty">用这些数字无法组成等于目标的表达式。</string>
     <string name="result_toggle_all">全部（%1$d）</string>
     <string name="result_toggle_essential">本质不同（%1$d）</string>
+
+    <!-- Settings -->
+    <string name="settings_open">设置</string>
+    <string name="settings_language_title">语言</string>
+    <string name="settings_language_helper">立即生效。</string>
+    <string name="language_system">跟随系统</string>
+
+    <string name="settings_default_target_title">默认目标数</string>
+    <string name="settings_default_target_current">当前：%1$s</string>
+    <string name="settings_default_target_value">%1$d</string>
+    <string name="settings_default_target_hint">自定义默认目标</string>
+    <string name="settings_default_target_helper">±%1$d 以内的整数。仅在界面打开时与长按「清空」之后生效，不会改动当前正在使用的目标值。</string>
+    <string name="err_default_target_not_a_number">请输入整数</string>
+    <string name="err_default_target_range">必须在 ±%1$d 以内</string>
+
+    <string name="settings_sound_title">按键音效</string>
+    <string name="settings_sound_helper">按下键盘按键时播放音效。关闭后键盘、求解与长按手势都会静音。</string>
 </resources>
