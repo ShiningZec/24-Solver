@@ -38,6 +38,18 @@ enum class AppLanguage(val languageTag: String?) {
     companion object {
         /** Unknown or absent tags (including a language we do not ship) fall back to [SYSTEM]. */
         fun forTag(tag: String?): AppLanguage = entries.firstOrNull { it.languageTag == tag } ?: SYSTEM
+
+        /**
+         * Matches a locale list like `zh-Hans-CN,en` — the form [AppCompatDelegate] reports — against
+         * the languages the app ships, by prefix, so a regional variant still counts as its language.
+         */
+        fun forLanguageTags(tags: String?): AppLanguage = tags
+            ?.split(',')
+            ?.asSequence()
+            ?.map { it.trim() }
+            ?.firstOrNull { it.isNotEmpty() }
+            ?.let { tag -> entries.firstOrNull { it.languageTag != null && tag.startsWith(it.languageTag) } }
+            ?: SYSTEM
     }
 }
 
@@ -75,9 +87,22 @@ class Settings(context: Context) {
     private val preferences =
         context.applicationContext.getSharedPreferences(FILE_NAME, Context.MODE_PRIVATE)
 
-    /** The language the user picked; [AppLanguage.SYSTEM] until they pick one. */
+    /**
+     * The language the app is running in, or [AppLanguage.SYSTEM] when it follows the device.
+     *
+     * It is read back from AppCompat rather than from a private copy, so a language chosen from
+     * Android's own per-app language settings shows up here too — one source of truth. The stored
+     * preference is only a fallback for an AppCompat that reports nothing.
+     */
     val language: AppLanguage
-        get() = AppLanguage.forTag(preferences.getString(KEY_LANGUAGE, null))
+        get() {
+            val current = AppCompatDelegate.getApplicationLocales().toLanguageTags()
+            return if (current.isEmpty()) {
+                AppLanguage.forTag(preferences.getString(KEY_LANGUAGE, null))
+            } else {
+                AppLanguage.forLanguageTags(current)
+            }
+        }
 
     /**
      * Stores [language] and switches the running app over to it straight away — including the

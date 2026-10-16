@@ -482,13 +482,13 @@ ViewCompat.setOnApplyWindowInsetsListener(binding.main) { view, insets ->
 | `IconTest` | 图标资源可解析（自适应图标 + 两层 drawable）、标记落在 66dp 安全圆内、两道标记不重叠 | 3 |
 | `LaunchSmokeTest`（androidTest） | 应用能在真机上启动并显示输入界面 | 1 |
 
-单元测试共 **131** 例。
+单元测试共 **132** 例。
 
 ### 4.2 构建与测试命令
 
 ```bash
 cd F:/code/Wakusei
-./gradlew.bat :app:testDebugUnitTest   # 全部单元测试（131 例，约 40 s）
+./gradlew.bat :app:testDebugUnitTest   # 全部单元测试（132 例，约 40 s）
 ./gradlew.bat :app:lintDebug           # Android Lint（当前应无 error / warning）
 ./gradlew.bat :app:assembleDebug       # 打 debug APK
 ./gradlew.bat :app:assembleDebugAndroidTest   # 编译仪器测试

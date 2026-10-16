@@ -123,6 +123,17 @@ class SettingsTest {
     }
 
     @Test
+    fun aReportedLocaleListIsMatchedByPrefix() {
+        // the form AppCompat reports, including regional variants
+        assertEquals(AppLanguage.CHINESE, AppLanguage.forLanguageTags("zh-Hans-CN,en"))
+        assertEquals(AppLanguage.JAPANESE, AppLanguage.forLanguageTags("ja-JP"))
+        assertEquals(AppLanguage.ENGLISH, AppLanguage.forLanguageTags("en-GB"))
+        assertEquals(AppLanguage.SYSTEM, AppLanguage.forLanguageTags(""))
+        assertEquals(AppLanguage.SYSTEM, AppLanguage.forLanguageTags("de-DE,fr"))
+        assertEquals(AppLanguage.SYSTEM, AppLanguage.forLanguageTags(null))
+    }
+
+    @Test
     fun theChosenLanguageRoundTrips() {
         val settings = Settings(context)
         settings.applyLanguage(AppLanguage.CHINESE)
