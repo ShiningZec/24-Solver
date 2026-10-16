@@ -43,7 +43,7 @@
 
     <!-- Hints / errors -->
     <!-- A single CLEAR press is silent; only the deliberate long press reports back. -->
-    <string name="msg_cleared_all">All Numbers Set to Default</string>
+    <string name="msg_cleared_all">Target and/or Numbers are Set to Default</string>
     <string name="err_empty_input">Enter a number first</string>
     <string name="err_no_numbers">Add at least one number before solving (type digits, then NEXT)</string>
     <plurals name="err_max_numbers">

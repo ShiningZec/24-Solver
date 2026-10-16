@@ -113,7 +113,10 @@ class DefaultTargetTest {
         shadowOf(Looper.getMainLooper()).idle()
 
         assertEquals("a CLEAR long press goes back to the configured default", "TARGET: -10", text(R.id.text_target))
-        assertEquals("All Numbers Set to Default", ShadowToast.getTextOfLatestToast())
+        assertEquals(
+            root.context.getString(R.string.msg_cleared_all),
+            ShadowToast.getTextOfLatestToast()
+        )
     }
 
     @Test

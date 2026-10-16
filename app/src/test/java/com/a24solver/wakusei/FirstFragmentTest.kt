@@ -413,7 +413,7 @@ class FirstFragmentTest {
         assertEquals("TARGET: 24", text(R.id.text_target))
         assertEquals("a long press ticks", HapticFeedbackConstants.KEYBOARD_TAP, lastAppHaptic())
         assertFalse("the platform's own long-press buzz is muted", key(R.id.button_clear).isHapticFeedbackEnabled)
-        assertEquals("All Numbers Set to Default", latestToast())
+        assertEquals(root.context.getString(R.string.msg_cleared_all), latestToast())
     }
 
     @Test

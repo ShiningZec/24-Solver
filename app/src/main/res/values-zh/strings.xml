@@ -18,11 +18,11 @@
     <!-- Buttons -->
     <string name="btn_next">确认</string>
     <string name="btn_target">目标</string>
-    <string name="btn_solve">求 解</string>
+    <string name="btn_solve">求　解</string>
     <string name="btn_clear">清空</string>
     <string name="btn_del">退格</string>
     <string name="btn_sign">+/−</string>
-    <string name="btn_back">返回</string>
+    <string name="btn_back">返　回</string>
 
     <!-- Hints / errors -->
     <string name="msg_cleared_all">已恢复默认设置</string>
