@@ -26,7 +26,7 @@ object SoundEffects {
 
     /** Note length and spacing of the two arpeggios (SOLVE, and a long press on CLEAR/DEL). */
     const val SCALE_NOTE_MS = 450
-    const val SCALE_GAP_MS = 80
+    const val SCALE_GAP_MS = 150
 
     /**
      * The final note of a scale is held much longer: it is the note the phrase is *about*, and
