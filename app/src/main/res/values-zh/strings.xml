@@ -25,7 +25,7 @@
     <string name="btn_back">返　回</string>
 
     <!-- Hints / errors -->
-    <string name="msg_cleared_all">已恢复默认设置</string>
+    <string name="msg_cleared_all">目标和候选数已恢复默认值</string>
     <string name="err_empty_input">请先输入一个数字</string>
     <string name="err_no_numbers">请先添加至少一个数字（输入后按「确认」）</string>
     <!-- 中文没有单复数变化，只需要 other 一种形式 -->
