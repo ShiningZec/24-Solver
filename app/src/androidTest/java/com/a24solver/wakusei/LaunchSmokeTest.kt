@@ -13,12 +13,10 @@ import org.junit.runner.RunWith
 /**
  * On-device smoke test: the app must actually start.
  *
- * The unit tests run under Robolectric, which cannot reproduce everything that happens on a real
- * device during process start. The launch crash this guards against is a concrete example:
- * `play-services-ads` merges `MobileAdsInitProvider` into the manifest, and that provider runs
- * inside `ActivityThread.handleBindApplication` — *before* `Application.onCreate` — where it aborts
- * the process when the AdMob app ID is missing. No JVM test can see that; launching the activity on
- * a device or emulator can.
+ * The unit tests run under Robolectric, which cannot reproduce everything a real process start does —
+ * manifest providers, resource loading for the device's actual configuration, the platform's own
+ * strictness. A failure there is invisible to every JVM test and only shows up as a crash on launch,
+ * so one test that merely opens the app and looks at the input screen is worth having.
  *
  * Run with `./gradlew :app:connectedDebugAndroidTest` and a device attached.
  */

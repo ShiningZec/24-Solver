@@ -26,20 +26,6 @@
             </intent-filter>
         </activity>
 
-        <!-- Required by the Google Mobile Ads SDK (play-services-ads): the library merges its
-             MobileAdsInitProvider into this manifest, and that provider runs inside
-             ActivityThread.handleBindApplication — before Application.onCreate — where it throws
-             IllegalStateException ("Missing application ID") if this meta-data is absent or
-             malformed. That surfaces as the launch crash
-                 RuntimeException: Unable to get provider
-                 com.google.android.gms.ads.MobileAdsInitProvider
-             and cannot be caught by application code, so the tag below is what keeps the ads
-             dependency safe to have on the classpath.
-             TODO: point @string/admob_app_id at the real AdMob app ID of this app. -->
-        <meta-data
-            android:name="com.google.android.gms.ads.APPLICATION_ID"
-            android:value="@string/admob_app_id" />
-
         <!-- Lets AppCompat remember the language the user picked in the settings screen on API
              levels below 33 (from 33 on, the system stores it for the app). Without this the choice
              would be forgotten as soon as the process dies. -->

@@ -54,7 +54,7 @@ Wakusei/
     ├── build.gradle.kts            # 模块配置（viewBinding、依赖、单测 JVM、SDK 版本）
     └── src/
         ├── main/
-        │   ├── AndroidManifest.xml        # 含 AdMob APPLICATION_ID（见 §3.7）
+        │   ├── AndroidManifest.xml        # Application、localeConfig、AppLocalesMetadataHolderService
         │   ├── java/com/a24solver/wakusei/
         │   │   ├── solver/                # ★ 求解核心：纯 Kotlin，不引用任何 android.*
         │   │   │   ├── Rational.kt        # ★ 精确有理数（BigInteger，构造即最简）
@@ -71,7 +71,6 @@ Wakusei/
         │   │   ├── SecondFragment.kt      # ★ 结果界面：答案列表 + 全部/本质不同切换
         │   │   ├── SettingsFragment.kt    # ★ 设置界面（见 §3.9）
         │   │   ├── SolveResultViewModel.kt# 两个界面之间共享的解集与显示选择
-        │   │   ├── Ads.kt                 # 广告 SDK 的异常防护层
         │   │   └── MainActivity.kt        # 壳：NavHost + 40dp 顶栏 + 设置按钮
         │   ├── keepRules/rules.keep       # R8 保留规则（模板，当前 release 未开启 R8）
         │   └── res/                       # values（英文）/ values-zh / values-ja / layout / xml / ...
@@ -91,7 +90,6 @@ Wakusei/
         │   ├── BottomControlsTest.kt      # Robolectric：系统栏 insets 与底部按钮不被导航栏遮挡
         │   ├── SolveResultViewModelTest.kt# 结果界面的显示规则与选择保持
         │   ├── settings/SettingsTest.kt   # 设置存储：默认值、持久化、校验
-        │   ├── AdsTest.kt                 # 广告防护
         │   └── IconTest.kt                # 图标资源与 66dp 安全区几何
         └── androidTest/java/…/LaunchSmokeTest.kt   # 真机冒烟：应用能启动（见 §4.3）
 ```
@@ -117,7 +115,6 @@ Wakusei/
 | 按键音效：15 键洗牌轮转、`SOLVE` 与长按的音阶、6 声部复音不互相打断、后台播放不阻塞界面 | ✅ 实现并有测试（见 §3.8） |
 | 三语界面：中文 / English / 日本語，英文为默认与 fallback，可实时切换 | ✅ 实现并有测试（见 §3.9） |
 | 设置页：语言、默认目标数（滑杆节点 + 自定义输入）、音效总开关 | ✅ 实现并有测试（见 §3.9） |
-| 广告 SDK 的异常防护 + 启动崩溃的配置修复 | ✅ 实现并有测试（见 §3.7） |
 | 真机 / 模拟器仪器测试 | ⚠️ 只有启动冒烟测试（见 §4.3），本机无设备可跑 |
 | 真机上听感调校（音量、音色、音符时长） | ⚠️ 参数是按听感选的理论值，未在真机上听过 |
 | n ≥ 6 的完全枚举 | ❌ 解空间本身过大，求解器会**快速报错**而不是卡死（见 §5.2） |
@@ -337,7 +334,7 @@ INPUT: 12 / TARGET INPUT: 12  ← text_current_input（当前缓冲 + 当前模�
 | --- | --- |
 | `CLEAR` 点按 | 只清当前模式归属的那一份（目标模式 → 目标回 24；否则清候选数），**完全静默** |
 | `CLEAR` 长按 | 候选数与目标全部复位，Toast「All Numbers Set to Default」+ 轻振动 |
-| `DEL` 长按 | 删除最后一个已提交的候选数；**仅在真的删除了**的时候轻振动 |
+| `DEL` 长按 | 三段式：①当前输入不为空 → **清空当前输入**；②输入为空但已提交候选数 → **撤销最后一个候选数**；③两者都空 → **什么都不做**（无 Toast、无振动）。①②会轻振动 |
 
 - 阈值 `x = 500 ms`：使用平台自身的长按超时（`ViewConfiguration.getLongPressTimeout()`，标准
   Android 上就是 500 ms），所以 `FirstFragment.LONG_PRESS_MS` 是**说明性常量**而非强制值。
@@ -345,7 +342,7 @@ INPUT: 12 / TARGET INPUT: 12  ← text_current_input（当前缓冲 + 当前模�
 - 振动采用 `View.performHapticFeedback(HapticFeedbackConstants.KEYBOARD_TAP)`：**弱**、无需任何
   权限（没有 `VIBRATE`、不直接使用 Vibrator），并且由系统设置托管——用户关闭「触感反馈 / 振动与
   触感」后即静默。键盘上的 `android:hapticFeedbackEnabled="false"` 用来关掉平台自己在长按时发出的
-  那一记通用震动，因此「有轻振动」恰好等价于「动作真的发生了」。
+  那一记通用震动，因此「有轻振动」恰好等价于「动作真的发生了」（`DEL` 长按的 ①② 两种情形都算）。
 
 ### 3.5 求解与结果界面
 
@@ -401,20 +398,24 @@ ViewCompat.setOnApplyWindowInsetsListener(binding.main) { view, insets ->
 然后断言根视图的内边距、两个布局都没有自己 fit system windows、并且 `SOLVE` / `BACK` 的底边确实落在
 导航栏顶边之上。把 inset 那行代码删掉，这个测试会失败 3 条——它是有牙齿的。
 
-### 3.7 广告依赖的异常防护
+### 3.7 没有广告
 
-`play-services-ads` 会把 `MobileAdsInitProvider` 合并进 manifest，它在
-`ActivityThread.handleBindApplication` 阶段（**早于 `Application.onCreate`**）运行，缺少
-`com.google.android.gms.ads.APPLICATION_ID` 时抛 `IllegalStateException`，表现为启动崩溃
-`RuntimeException: Unable to get provider com.google.android.gms.ads.MobileAdsInitProvider`。
-**这种崩溃无法用应用代码 try/catch**，所以：
+这个应用**不接入任何广告**，并且把先前「先留着广告依赖」的做法也一并去掉了：`play-services-ads`
+`@string/admob_app_id` 全部删除，`AdsTest` 也随之删除。
 
-- `AndroidManifest.xml` 声明该 meta-data（值取自 `@string/admob_app_id`，当前是 Google 官方样例
-  ID，**发布前必须替换**）；`LaunchSmokeTest` 是在真机上验证这条的唯一手段；
-- `Ads.kt` 提供异常防护层（`loadSafely` 兜住 `Throwable`、`initialize` 幂等），
-  `MainActivity.onCreate` 用 **applicationContext** 调用一次（不持有 Activity 引用）；
-- `AdsTest` 断言该 meta-data 存在且形态正确（`ca-app-pub-…~…`）。
+这不仅是「少一个功能」，还顺手消掉了一整类启动崩溃风险：`play-services-ads` 会把
+`MobileAdsInitProvider` 合并进 manifest，而该 provider 在 `ActivityThread.handleBindApplication`
+阶段（**早于 `Application.onCreate`**）运行，缺少 app ID 时抛 `IllegalStateException`，表现为
 
+```
+RuntimeException: Unable to get provider com.google.android.gms.ads.MobileAdsInitProvider
+```
+
+——这种崩溃**无法用应用代码 try/catch**，只能靠 manifest 配置正确来避免。依赖既然不在了，这条
+路径、以及 Google Mobile Ads SDK 带来的组件与权限合并，就都不存在了。
+
+实测（删除后）：合并后的 manifest 里不再有任何 ads provider / meta-data，**debug APK 从
+12,402,202 字节降到 7,606,755 字节（约 −39%，−4.8 MB）**。
 ### 3.8 按键音效
 
 **全部是运行时合成的**（`sound/ToneSynthesizer.kt`）：基频 + 两个高次模式（真实音条大约调在
@@ -506,7 +507,7 @@ ViewCompat.setOnApplyWindowInsetsListener(binding.main) { view, insets ->
 | `ExpressionTest` | 括号最少化规则、负数叶子、规范形、随机树打印往返、求值一致 | 6 |
 | `SolverTest` | 解数（独立验证）、每个解真的等于目标且每个数用一次、去重与排序、本质解每类一条、与暴力枚举差分、预算与输入校验 | 15 |
 | `SolverPurityTest` | `solver` 包编译产物不引用 `android`/`androidx` | 1 |
-| `FirstFragmentTest` | 键盘布局/尺寸/配色、按键接线、拉杆与写回、CLEAR 点按与长按、DEL 长按、校验、后台求解与结果往返、全部/本质切换及其旋转保持、旋转不丢输入（Robolectric） | 29 |
+| `FirstFragmentTest` | 键盘布局/尺寸/配色、按键接线、拉杆与写回、CLEAR 点按与长按、DEL 长按的三段式（清输入 → 撤候选 → 什么都不做）、校验、后台求解与结果往返、全部/本质切换及其旋转保持、旋转不丢输入（Robolectric） | 32 |
 | `KeypadSoundTest` | 15 个键各发一个音、一轮用遍音集且以开头音起、音符不被截断、音阶每个音都在自己的起音位置出现、第二页与切换按钮不发声、关掉开关后彻底静音（Robolectric + 假 sink） | 12 |
 | `LanguageDeferralTest` | 选语言不改当前语言、选择留存、应用那一步才切换、切回跟随系统能生效、应用内选择优先于系统侧设置、manifest 指向自己的 Application | 8 |
 | `SettingsFragmentTest` | 语言下拉的四项与「只记录不生效」、**离开设置页才切换**、旋转不算离开、状态行与 Toast、预设节点、`CUSTOMIZE` 启用输入、非法值只报错不落盘、空值不算错、音效开关、回显已存值（Robolectric） | 15 |
@@ -524,7 +525,6 @@ ViewCompat.setOnApplyWindowInsetsListener(binding.main) { view, insets ->
 | `SolveResultViewModelTest` | 显示哪一份解集、两组相同时回落到「全部」、选择随 ViewModel 保留 | 4 |
 | `KeypadLabelFitTest` | 键盘键内边距 4dp（含 resolve 后的 left/right）、`maxLines=1`、自动缩小开启且范围正确；中/英/日文案在最小 12sp 下都放得下（保守字宽估算） | 7 |
 | `BottomControlsTest` | 系统栏 insets 真的被应用到根视图、布局没有重复 fit、`SOLVE` / `BACK` 落在导航栏之上且留有底部余量（Robolectric 里派发合成 insets） | 4 |
-| `AdsTest` | app ID 声明、异常防护、初始化不抛 | 3 |
 | `IconTest` | 图标资源可解析（自适应图标 + 两层 drawable）、标记落在 66dp 安全圆内、两道标记不重叠 | 3 |
 | `LaunchSmokeTest`（androidTest） | 应用能在真机上启动并显示输入界面 | 1 |
 
@@ -632,8 +632,8 @@ n=8 是 1.1×10^12。**这是输出本身的规模**，换算法也救不了—�
 - `release` 构建**没有开启 R8**（`optimization.enable = false`，见 `app/build.gradle.kts` 的注释）：
   打开它会影响用户实际安装的那个产物，而开启后只能在真机上验证；本仓库的验证手段停在
   「能编译、能过测试」，所以没有贸然打开。
-- 广告：`admob_app_id` 仍是 Google 样例 ID；依赖存在但没有任何广告位。发布前要么换成真实 ID，
-  要么连同 `Ads.kt` 与 manifest meta-data 一起移除（后者能顺手删掉一整类启动崩溃风险）。
+- 广告：依赖与相关代码已按决定**全部移除**（见 §3.7），因此没有这条待办；将来若要重新接广告，
+  需要重新面对 manifest provider 带来的启动崩溃风险。
 
 ---
 
@@ -677,6 +677,8 @@ n=8 是 1.1×10^12。**这是输出本身的规模**，换算法也救不了—�
 - [x] 设置页与标题栏三横线入口（跟随主题前景色），两个界面都能进（§3.9）
 - [x] 默认目标数：滑杆节点 + `CUSTOMIZE` 数字输入，影响初始化与长按 CLEAR，不动当前目标（§3.9）
 - [x] 音效总开关（§3.9）
+- [x] 广告：按决定**不接入广告**，依赖 + `Ads.kt` + manifest meta-data + `AdsTest` 全部移除（§3.7）
+- [x] `DEL` 长按改为三段式：先清当前输入，输入为空再撤销最后一个候选数，都没有则什么都不做（§3.4）
 
 ### P2 —— 工程与体验（未完成）
 
@@ -685,7 +687,6 @@ n=8 是 1.1×10^12。**这是输出本身的规模**，换算法也救不了—�
 - [ ] 请母语者校对中文/日文文案（完整性已由 lint 保证，用词没有）
 - [ ] 答案列表换成 `RecyclerView`（现在解数上千时是单个 TextView）
 - [ ] 把 `solver/` 抽成纯 Kotlin JVM 模块（`SolverPurityTest` 已守住依赖边界）
-- [ ] 广告：把 `admob_app_id` 换成真实 ID，或确定不做广告后移除依赖 + meta-data + `Ads.kt`
 - [ ] 打开 release 的 R8（`optimization.enable = true`）+ 两个 Fragment 的 keep 规则（已写在
       `app/src/main/keepRules/rules.keep` 里），并在真机上冒烟验证
 - [ ] 探索 Robolectric 对新 SDK 的支持，去掉每个测试类上的 `@Config(sdk = [34])`

@@ -56,11 +56,6 @@ class MainActivity : AppCompatActivity() {
         super.onCreate(savedInstanceState)
         enableEdgeToEdge()
 
-        // The ads SDK is initialized defensively: see Ads — a failing ad SDK must never take the
-        // app down, and the launch crash of MobileAdsInitProvider is prevented by the
-        // APPLICATION_ID meta-data in AndroidManifest.xml rather than by code.
-        Ads.initialize(applicationContext)
-
         binding = ActivityMainBinding.inflate(layoutInflater)
         setContentView(binding.root)
 

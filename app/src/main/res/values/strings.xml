@@ -54,13 +54,6 @@
     <string name="err_target_range">The target must be within ±%1$d</string>
     <string name="err_solver">Solver rejected the input: %1$s</string>
 
-    <!-- AdMob app ID, referenced by AndroidManifest.xml (meta-data
-         com.google.android.gms.ads.APPLICATION_ID). Google's official sample app ID is declared
-         here so a debug build keeps working; the SDK refuses to start without one.
-         TODO: replace with this app's real AdMob app ID (AdMob console → App settings → App ID,
-         format ca-app-pub-…~…) before releasing. -->
-    <string name="admob_app_id" translatable="false">ca-app-pub-3940256099942544~3347511713</string>
-
     <!-- Result screen -->
     <plurals name="result_header">
         <item quantity="one">%1$d answer for target %2$d from %3$s</item>
