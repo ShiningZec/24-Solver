@@ -471,7 +471,7 @@ ViewCompat.setOnApplyWindowInsetsListener(binding.main) { view, insets ->
 | `KeypadSoundTest` | 15 个键各发一个音、前八个音正好是八个不同音高、`SOLVE`/长按的音阶逐段比对波形、第二页与切换按钮不发声、关掉开关后彻底静音（Robolectric + 假 sink） | 9 |
 | `SettingsFragmentTest` | 语言下拉的四项与切换、预设节点、`CUSTOMIZE` 启用输入、非法值只报错不落盘、空值不算错、音效开关、回显已存值（Robolectric） | 12 |
 | `DefaultTargetTest` | 新界面从默认目标开始、长按 CLEAR 回到默认目标、改设置不影响当前目标、设置按钮进入设置页/不叠加/返回原界面 | 7 |
-| `settings.SettingsTest` | 默认值、预设节点取值、`CUSTOMIZE` 与自定义值、±16384 校验、持久化、语言标签映射 | 7 |
+| `settings.SettingsTest` | 默认值、预设节点取值、`CUSTOMIZE` 与自定义值、±16384 校验、持久化、语言标签与前缀匹配 | 8 |
 | `sound.ToneSynthesizerTest` | 长度、峰值不削波、衰减、起始无爆音、**自相关测出基频与音高一致**、静音、音阶拼接 | 9 |
 | `sound.NoteQueueTest` | 八音用完才重复、每轮重洗、`reset`、空队列被拒 | 5 |
 | `sound.ToneEngineTest` | 一段音阶一次写入、每次调用都发声、**play() 不阻塞调用方**、音频设备失败被吞、shutdown 释放 | 5 |
