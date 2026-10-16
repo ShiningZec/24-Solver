@@ -51,7 +51,10 @@
     <!-- Settings -->
     <string name="settings_open">設定</string>
     <string name="settings_language_title">言語</string>
-    <string name="settings_language_helper">すぐに反映されます。</string>
+    <string name="settings_language_helper">次回アプリを起動したときに反映されます。</string>
+    <string name="settings_language_active">現在使用中: %1$s</string>
+    <string name="settings_language_pending">再起動後: %1$s</string>
+    <string name="msg_language_pending">言語は次回アプリを起動したときに切り替わります。</string>
     <string name="language_system">システムに従う</string>
 
     <string name="settings_default_target_title">既定の目標値</string>

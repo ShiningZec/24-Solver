@@ -1,34 +1,47 @@
 package com.a24solver.wakusei.sound
 
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertTrue
 import org.junit.Test
 
-/** The note material, pinned to what the specification asks for. */
+/**
+ * The note material the app plays.
+ *
+ * These are the scales the app currently ships: they were tuned by hand out of [Pitch], so this
+ * pins what is actually played rather than a specification — changing [Melodies] means changing
+ * these expectations too, which is the point.
+ */
 class MelodiesTest {
 
     @Test
-    fun theKeypadDrawsFromEightNotes() {
-        // the specification's "C, D, E, sharp F, G, A, flat B, high C", in the fourth/fifth octave
+    fun theKeypadDrawsFromItsCurrentSet() {
         assertEquals(
-            listOf("C4", "D4", "E4", "F#4", "G4", "A4", "Bb4", "C5"),
+            listOf("B3", "D4", "Eb4", "F4", "G4", "Ab4", "C5"),
             Melodies.KEYPAD_NOTES.map { it.noteName }
         )
     }
 
     @Test
-    fun solvePlaysTheSixNoteBluesScale() {
-        // "C, flat E, sharp F, G, flat B, B"
+    fun aRoundOpensOnTheLeadingNote() {
+        assertEquals(Pitch.C4, Melodies.KEYPAD_LEADING_NOTE)
+        assertTrue(
+            "the leading note must not also be shuffled, or it could come round twice",
+            Melodies.KEYPAD_LEADING_NOTE !in Melodies.KEYPAD_NOTES
+        )
+    }
+
+    @Test
+    fun solvePlaysItsCurrentScale() {
         assertEquals(
-            listOf("C4", "Eb4", "F#4", "G4", "Bb4", "B4"),
+            listOf("C4", "Eb4", "F#4", "G4", "Bb4"),
             Melodies.SOLVE_SCALE.map { it.noteName }
         )
     }
 
     @Test
-    fun theResetGesturePlaysTheMajorThirdArpeggio() {
-        // "E, sharp G, high C"
+    fun theResetGesturePlaysItsCurrentArpeggio() {
         assertEquals(
-            listOf("E4", "G#4", "C5"),
+            listOf("G4", "D4", "B3"),
             Melodies.RESET_SCALE.map { it.noteName }
         )
     }

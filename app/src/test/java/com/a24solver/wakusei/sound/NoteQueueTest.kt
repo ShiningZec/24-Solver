@@ -9,30 +9,32 @@ import kotlin.random.Random
 
 class NoteQueueTest {
 
+    private val bag = listOf(Pitch.D4, Pitch.E4, Pitch.F4)
+
     @Test
     fun everyNoteIsUsedOnceBeforeAnyRepeats() {
-        val queue = NoteQueue(Melodies.KEYPAD_NOTES, Random(1))
+        val queue = NoteQueue(bag, Random(1))
 
-        val firstRound = List(Melodies.KEYPAD_NOTES.size) { queue.next() }
+        val firstRound = List(bag.size) { queue.next() }
         assertEquals(
             "a round must contain each note exactly once",
-            Melodies.KEYPAD_NOTES.toSet(),
+            bag.toSet(),
             firstRound.toSet()
         )
-        assertEquals(Melodies.KEYPAD_NOTES.size, firstRound.size)
 
-        val secondRound = List(Melodies.KEYPAD_NOTES.size) { queue.next() }
-        assertEquals(Melodies.KEYPAD_NOTES.toSet(), secondRound.toSet())
+        val secondRound = List(bag.size) { queue.next() }
+        assertEquals(bag.toSet(), secondRound.toSet())
     }
 
     @Test
     fun theOrderIsShuffledAndRerolled() {
-        val queue = NoteQueue(Melodies.KEYPAD_NOTES, Random(7))
-        val rounds = List(4) { List(Melodies.KEYPAD_NOTES.size) { queue.next() } }
+        val notes = listOf(Pitch.C4, Pitch.D4, Pitch.E4, Pitch.F4, Pitch.G4, Pitch.A4)
+        val queue = NoteQueue(notes, Random(7))
+        val rounds = List(4) { List(notes.size) { queue.next() } }
 
         assertTrue(
-            "the shuffled order should not be the specified order every round",
-            rounds.any { it != Melodies.KEYPAD_NOTES }
+            "the shuffled order should not be the given order every round",
+            rounds.any { it != notes }
         )
         assertNotEquals("two rounds in a row were identical", rounds[0], rounds[1])
     }
@@ -46,12 +48,42 @@ class NoteQueueTest {
     }
 
     @Test
+    fun aLeadingNoteOpensEveryRoundWithoutRepeatingInsideIt() {
+        val rest = listOf(Pitch.B3, Pitch.D4, Pitch.F4, Pitch.C5)
+        val queue = NoteQueue(rest, Random(11), leadingNote = Pitch.C4)
+
+        repeat(3) {
+            val round = List(rest.size + 1) { queue.next() }
+            assertEquals("a round must open on the leading note", Pitch.C4, round.first())
+            assertEquals(
+                "the rest of the round is every other note, exactly once",
+                rest.toSet(),
+                round.drop(1).toSet()
+            )
+            assertEquals("nothing may repeat inside a round", round.size, round.toSet().size)
+        }
+    }
+
+    @Test
+    fun aLeadingNoteAlreadyInTheBagIsNotShuffledTwice() {
+        // the trap this parameter exists to avoid: a leading note that is also one of the notes
+        val notes = listOf(Pitch.C4, Pitch.D4, Pitch.E4)
+        val queue = NoteQueue(notes, Random(5), leadingNote = Pitch.C4)
+
+        val round = List(notes.size) { queue.next() }
+
+        assertEquals(Pitch.C4, round.first())
+        assertEquals("C4 must not come round twice in one round", 1, round.count { it == Pitch.C4 })
+        assertEquals(notes.toSet(), round.toSet())
+    }
+
+    @Test
     fun resetStartsAFreshBag() {
-        val queue = NoteQueue(Melodies.KEYPAD_NOTES, Random(5))
+        val queue = NoteQueue(bag, Random(5))
         queue.next()
         queue.reset()
-        val round = List(Melodies.KEYPAD_NOTES.size) { queue.next() }
-        assertEquals(Melodies.KEYPAD_NOTES.toSet(), round.toSet())
+        val round = List(bag.size) { queue.next() }
+        assertEquals(bag.toSet(), round.toSet())
     }
 
     @Test

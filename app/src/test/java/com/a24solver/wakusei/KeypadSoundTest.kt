@@ -49,6 +49,10 @@ class KeypadSoundTest {
         R.id.button_sign, R.id.button_next, R.id.button_clear, R.id.button_del, R.id.button_target
     )
 
+    /** The notes one round of the shuffled bag is made of: the leading note, then the rest. */
+    private val roundNotes: List<Pitch> =
+        listOfNotNull(Melodies.KEYPAD_LEADING_NOTE) + Melodies.KEYPAD_NOTES
+
     @Before
     fun setUp() {
         sink = RecordingSink()
@@ -88,11 +92,33 @@ class KeypadSoundTest {
         ToneSynthesizer.note(pitch, durationMs, ToneSynthesizer.SAMPLE_RATE)
 
     /** The pitch a recorded keypad tone was made of, or null when nothing matches. */
-    private fun pitchOf(buffer: ShortArray): Pitch? = Melodies.KEYPAD_NOTES.firstOrNull {
+    private fun pitchOf(buffer: ShortArray): Pitch? = roundNotes.firstOrNull {
         buffer.contentEquals(noteSamples(it, SoundEffects.KEY_NOTE_MS))
     }
 
-    /** The solve runs on a background dispatcher, so the result screen arrives a little later. */
+    /** The expected sample count of one scale: equal notes, then a longer final one. */
+    private fun scaleLength(pitches: List<Pitch>): Int =
+        ToneSynthesizer.samplesFor(
+            SoundEffects.SCALE_NOTE_MS + SoundEffects.SCALE_GAP_MS,
+            ToneSynthesizer.SAMPLE_RATE
+        ) * (pitches.size - 1) +
+            ToneSynthesizer.samplesFor(SoundEffects.SCALE_LAST_NOTE_MS, ToneSynthesizer.SAMPLE_RATE)
+
+    /** The slice of [phrase] that holds the note itself at [index] (its gap is not included). */
+    private fun noteSlice(phrase: ShortArray, pitches: List<Pitch>, index: Int): ShortArray {
+        val step = ToneSynthesizer.samplesFor(
+            SoundEffects.SCALE_NOTE_MS + SoundEffects.SCALE_GAP_MS,
+            ToneSynthesizer.SAMPLE_RATE
+        )
+        val start = index * step
+        val end = if (index == pitches.lastIndex) {
+            phrase.size
+        } else {
+            start + ToneSynthesizer.samplesFor(SoundEffects.SCALE_NOTE_MS, ToneSynthesizer.SAMPLE_RATE)
+        }
+        return phrase.copyOfRange(start, end)
+    }
+
     private fun awaitResultScreen(timeoutMs: Long = 20_000) {
         val deadline = System.currentTimeMillis() + timeoutMs
         while (System.currentTimeMillis() < deadline) {
@@ -103,7 +129,6 @@ class KeypadSoundTest {
         assertEquals(R.id.SecondFragment, navController.currentDestination?.id)
     }
 
-    /** Waits for a view of the (asynchronously reached) result screen to exist. */
     private fun awaitView(id: Int, timeoutMs: Long = 5_000): View {
         val deadline = System.currentTimeMillis() + timeoutMs
         while (System.currentTimeMillis() < deadline) {
@@ -132,61 +157,76 @@ class KeypadSoundTest {
     }
 
     @Test
-    fun theFifteenKeysDrawEveryNoteBeforeRepeatingOne() {
+    fun aRoundUsesEveryNoteBeforeRepeatingOne() {
         // one full round of the shuffled bag, straight through the keypad
-        toneKeyIds.forEach { click(it) }
+        toneKeyIds.take(roundNotes.size).forEach { click(it) }
 
         val playedPitches = sink.played.map { requireNotNull(pitchOf(it)) { "unrecognised note" } }
-        assertEquals(toneKeyIds.size, playedPitches.size)
         assertEquals(
-            "the first eight tones must use each note exactly once",
-            Melodies.KEYPAD_NOTES.toSet(),
-            playedPitches.take(Melodies.KEYPAD_NOTES.size).toSet()
+            "one round must use each note of the set exactly once",
+            roundNotes.toSet(),
+            playedPitches.toSet()
         )
-        // eight notes in the bag, fifteen presses: seven notes come round a second time
-        assertEquals(Melodies.KEYPAD_NOTES.size + 7, playedPitches.size)
+        assertEquals(roundNotes.size, playedPitches.size)
     }
 
     @Test
-    fun solvePlaysTheSixNoteScale() {
+    fun aRoundOpensOnTheLeadingNote() {
+        click(toneKeyIds.first())
+
+        assertEquals(Pitch.C4, pitchOf(sink.played.single()))
+    }
+
+    @Test
+    fun theKeypadNotesSoundAtTheirOwnPitch() {
+        // press the whole round, and check each note is one of the set exactly as synthesised
+        toneKeyIds.take(roundNotes.size).forEach { click(it) }
+        assertTrue(sink.played.all { pitchOf(it) != null })
+    }
+
+    @Test
+    fun solvePlaysItsScaleWithALongFinalNote() {
         click(R.id.button_solve)
 
         val phrase = sink.played.single()
-        val noteLength = ToneSynthesizer.samplesFor(
-            SoundEffects.SCALE_NOTE_MS + SoundEffects.SCALE_GAP_MS,
-            ToneSynthesizer.SAMPLE_RATE
-        )
-        assertEquals(noteLength * Melodies.SOLVE_SCALE.size, phrase.size)
+        assertEquals(scaleLength(Melodies.SOLVE_SCALE), phrase.size)
         Melodies.SOLVE_SCALE.forEachIndexed { index, pitch ->
-            val slice = phrase.copyOfRange(
-                index * noteLength,
-                index * noteLength + ToneSynthesizer.samplesFor(SoundEffects.SCALE_NOTE_MS, ToneSynthesizer.SAMPLE_RATE)
-            )
+            val durationMs = if (index == Melodies.SOLVE_SCALE.lastIndex) {
+                SoundEffects.SCALE_LAST_NOTE_MS
+            } else {
+                SoundEffects.SCALE_NOTE_MS
+            }
             assertTrue(
                 "SOLVE note $index should be ${pitch.noteName}",
-                slice.contentEquals(noteSamples(pitch, SoundEffects.SCALE_NOTE_MS))
+                noteSlice(phrase, Melodies.SOLVE_SCALE, index)
+                    .contentEquals(noteSamples(pitch, durationMs))
             )
         }
     }
 
     @Test
-    fun aLongPressOnClearAndDelPlaysTheResetArpeggio() {
+    fun aLongPressOnClearAndDelPlaysItsArpeggioWithALongFinalNote() {
         for (id in listOf(R.id.button_clear, R.id.button_del)) {
             sink.played.clear()
             longClick(id)
 
             val phrase = sink.played.single()
-            val noteLength = ToneSynthesizer.samplesFor(
-                SoundEffects.SCALE_NOTE_MS + SoundEffects.SCALE_GAP_MS,
-                ToneSynthesizer.SAMPLE_RATE
-            )
-            assertEquals("long press on $id", noteLength * Melodies.RESET_SCALE.size, phrase.size)
+            assertEquals("long press on $id", scaleLength(Melodies.RESET_SCALE), phrase.size)
             assertTrue(
                 "the arpeggio should start on ${Melodies.RESET_SCALE.first().noteName}",
-                phrase.copyOfRange(
-                    0,
-                    ToneSynthesizer.samplesFor(SoundEffects.SCALE_NOTE_MS, ToneSynthesizer.SAMPLE_RATE)
-                ).contentEquals(noteSamples(Melodies.RESET_SCALE.first(), SoundEffects.SCALE_NOTE_MS))
+                noteSlice(phrase, Melodies.RESET_SCALE, 0).contentEquals(
+                    noteSamples(Melodies.RESET_SCALE.first(), SoundEffects.SCALE_NOTE_MS)
+                )
+            )
+            assertTrue(
+                "the last note should be the long one",
+                noteSlice(phrase, Melodies.RESET_SCALE, Melodies.RESET_SCALE.lastIndex)
+                    .contentEquals(
+                        noteSamples(
+                            Melodies.RESET_SCALE.last(),
+                            SoundEffects.SCALE_LAST_NOTE_MS
+                        )
+                    )
             )
         }
     }
@@ -199,12 +239,25 @@ class KeypadSoundTest {
         longClick(R.id.button_clear)
 
         assertEquals("a long press is one phrase, not a tone plus a phrase", afterTone + 1, sink.played.size)
-        assertEquals(
-            ToneSynthesizer.samplesFor(
-                (SoundEffects.SCALE_NOTE_MS + SoundEffects.SCALE_GAP_MS) * Melodies.RESET_SCALE.size,
-                ToneSynthesizer.SAMPLE_RATE
-            ),
-            sink.sampleCounts.last()
+        assertEquals(scaleLength(Melodies.RESET_SCALE), sink.sampleCounts.last())
+    }
+
+    @Test
+    fun aNoteIsNeverCutShortByTheNextOne() {
+        // the requirement this exists for: press three keys and all three notes are handed over in
+        // full — nothing is truncated to make room for the next one
+        click(R.id.button1)
+        click(R.id.button2)
+        click(R.id.button3)
+
+        assertEquals(3, sink.played.size)
+        val expectedLength = ToneSynthesizer.samplesFor(
+            SoundEffects.KEY_NOTE_MS,
+            ToneSynthesizer.SAMPLE_RATE
+        )
+        assertTrue(
+            "every note should be complete, were ${sink.sampleCounts}",
+            sink.sampleCounts.all { it == expectedLength }
         )
     }
 

@@ -40,7 +40,9 @@ class SettingsTest {
         assertEquals(24, settings.defaultTarget)
         assertEquals(DefaultTargetPreset.TWENTY_FOUR, settings.defaultTargetPreset)
         assertTrue(settings.soundEnabled)
-        assertEquals(AppLanguage.SYSTEM, settings.language)
+        assertEquals(AppLanguage.SYSTEM, settings.requestedLanguage)
+        assertEquals(AppLanguage.SYSTEM, settings.activeLanguage)
+        assertFalse(settings.languageChangeIsPending)
     }
 
     @Test
@@ -134,14 +136,15 @@ class SettingsTest {
     }
 
     @Test
-    fun theChosenLanguageRoundTrips() {
+    fun theRequestedLanguageRoundTripsWithoutBeingApplied() {
         val settings = Settings(context)
-        settings.applyLanguage(AppLanguage.CHINESE)
+        settings.requestLanguage(AppLanguage.CHINESE)
 
-        assertEquals(AppLanguage.CHINESE, settings.language)
-        assertEquals(AppLanguage.CHINESE, Settings(context).language)
+        assertEquals(AppLanguage.CHINESE, settings.requestedLanguage)
+        assertEquals(AppLanguage.CHINESE, Settings(context).requestedLanguage)
+        assertEquals("requesting must not switch anything", AppLanguage.SYSTEM, settings.activeLanguage)
 
-        settings.applyLanguage(AppLanguage.SYSTEM)
-        assertEquals(AppLanguage.SYSTEM, settings.language)
+        settings.requestLanguage(AppLanguage.SYSTEM)
+        assertEquals(AppLanguage.SYSTEM, settings.requestedLanguage)
     }
 }

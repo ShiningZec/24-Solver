@@ -41,6 +41,21 @@ class ToneSynthesizerTest {
     }
 
     @Test
+    fun aLongNoteDecaysToNearlyNothingBeforeItEnds() {
+        // this is what lets notes ring into each other without a click: by the end of a 750 ms note
+        // the amplitude is a few percent of the strike, and the last few milliseconds are faded out
+        val samples = ToneSynthesizer.note(Pitch.C4, 750, sampleRate)
+        val peak = samples.maxOf { abs(it.toInt()) }
+        val tailPeak = samples.copyOfRange(samples.size - 2_000, samples.size)
+            .maxOf { abs(it.toInt()) }
+
+        assertTrue(
+            "the tail still peaks at $tailPeak against $peak — the note would end audibly",
+            tailPeak < peak / 15
+        )
+    }
+
+    @Test
     fun theAttackStartsFromSilence() {
         val samples = ToneSynthesizer.note(Pitch.C4, 200, sampleRate)
         val firstWindow = rms(samples, 0, 40)
@@ -112,14 +127,14 @@ class ToneSynthesizerTest {
     }
 
     @Test
-    fun aSequenceIsTheNotesLaidEndToEnd() {
+    fun aPhraseIsTheNotesLaidEndToEnd() {
         val noteMs = 50
         val gapMs = 20
         val pitches = listOf(Pitch.C4, Pitch.E4, Pitch.G4)
-        val sequence = ToneSynthesizer.sequence(pitches, noteMs, gapMs, sampleRate)
+        val phrase = ToneSynthesizer.phrase(pitches, noteMs, gapMs, sampleRate = sampleRate)
 
         val step = ToneSynthesizer.samplesFor(noteMs + gapMs, sampleRate)
-        assertEquals(step * pitches.size, sequence.size)
+        assertEquals("no silence should follow the last note", step * 2 + ToneSynthesizer.samplesFor(noteMs, sampleRate), phrase.size)
 
         // each slice sounds exactly like the single note it was built from ...
         pitches.forEachIndexed { index, pitch ->
@@ -127,18 +142,36 @@ class ToneSynthesizerTest {
             val expected = ToneSynthesizer.note(pitch, noteMs, sampleRate)
             assertTrue(
                 "slice $index does not match ${pitch.noteName}",
-                expected.indices.all { sequence[offset + it] == expected[it] }
+                expected.indices.all { phrase[offset + it] == expected[it] }
             )
         }
         // ... and the gaps really are silent
         val gapStart = ToneSynthesizer.samplesFor(noteMs, sampleRate)
-        assertTrue((gapStart until step).all { sequence[it] == 0.toShort() })
+        assertTrue((gapStart until step).all { phrase[it] == 0.toShort() })
     }
 
     @Test
-    fun aSequenceNeedsNotes() {
+    fun aPhraseCanEndOnALongerNote() {
+        val pitches = listOf(Pitch.C4, Pitch.E4, Pitch.G4)
+        val lastNoteMs = 400
+
+        val phrase = ToneSynthesizer.phrase(pitches, noteMs = 50, gapMs = 20, lastNoteMs = lastNoteMs, sampleRate = sampleRate)
+
+        val step = ToneSynthesizer.samplesFor(70, sampleRate)
+        assertEquals(step * 2 + ToneSynthesizer.samplesFor(lastNoteMs, sampleRate), phrase.size)
+        // the final note is the long one, and it is the note it should be
+        val finalSlice = phrase.copyOfRange(step * 2, phrase.size)
+        assertTrue(finalSlice.contentEquals(ToneSynthesizer.note(Pitch.G4, lastNoteMs, sampleRate)))
+        assertTrue("the last note should be much longer", finalSlice.size > step * 2)
+    }
+
+    @Test
+    fun aPhraseNeedsNotesAndPositiveLengths() {
         assertThrows(IllegalArgumentException::class.java) {
-            ToneSynthesizer.sequence(emptyList(), 100, 10, sampleRate)
+            ToneSynthesizer.phrase(emptyList(), 100, 10, sampleRate = sampleRate)
+        }
+        assertThrows(IllegalArgumentException::class.java) {
+            ToneSynthesizer.phrase(listOf(Pitch.C4), noteMs = 0, gapMs = 0, sampleRate = sampleRate)
         }
         assertThrows(IllegalArgumentException::class.java) {
             ToneSynthesizer.note(Pitch.C4, 0, sampleRate)

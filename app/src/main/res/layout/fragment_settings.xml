@@ -37,6 +37,15 @@
                 tools:ignore="LabelFor" />
         </com.google.android.material.textfield.TextInputLayout>
 
+        <!-- Which language is actually on screen, and which one is waiting for a restart. -->
+        <TextView
+            android:id="@+id/text_language_status"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="4dp"
+            android:textAppearance="?attr/textAppearanceBodySmall"
+            tools:text="In use now: English&#10;After a restart: 日本語" />
+
         <!-- == default target -->
         <TextView
             android:layout_width="match_parent"

@@ -15,10 +15,12 @@ import java.util.concurrent.TimeUnit
  *
  * The engine only ever talks to this interface, so tests can watch playback — and count notes —
  * without an audio device, and without the engine knowing anything about it.
+ *
+ * [play] returns as soon as the note has *started*; it is not expected to wait for it to finish.
  */
 interface AudioSink {
 
-    /** Plays [samples] (mono, 16-bit) at [sampleRate]. Blocks until the sound has finished. */
+    /** Starts [samples] (mono, 16-bit) at [sampleRate]. Does not block until it has finished. */
     fun play(samples: ShortArray, sampleRate: Int)
 
     /** Frees whatever the sink holds. Called once, when the engine is shut down. */
@@ -28,15 +30,10 @@ interface AudioSink {
 /**
  * Plays a phrase of notes on background workers.
  *
- * [play] never blocks the caller: it renders nothing on the calling thread and hands the work to
- * the workers, which is what keeps a key press from ever waiting on audio. The queue is deliberately
- * short and keeps the *newest* phrases, so hammering the keypad plays the latest notes instead of
- * falling further and further behind.
- *
- * Two workers rather than one, because a note rings for a few hundred milliseconds: with a single
- * worker the next key press would have to wait for the previous note to finish ringing, and a
- * quick run of keys would sound like an echo of itself. The sink itself makes sure only one note is
- * audible at a time by cutting the previous one (see [AudioTrackSink]).
+ * [play] never blocks the caller and never waits for the sound: rendering happens on a worker (from
+ * [PhraseCache], so it is usually a lookup) and the sink starts a voice straight away. Nothing is
+ * queued behind a note that is still ringing — that is the sink's business, and it overlaps notes
+ * rather than cutting them off.
  *
  * Failures are swallowed on purpose: a device without a usable audio output must not be able to
  * break the puzzle.
@@ -44,7 +41,8 @@ interface AudioSink {
 class ToneEngine(
     private val sink: AudioSink,
     private val sampleRate: Int = ToneSynthesizer.SAMPLE_RATE,
-    worker: Executor? = null
+    worker: Executor? = null,
+    private val cache: PhraseCache = PhraseCache(sampleRate = sampleRate)
 ) {
 
     private val executor: Executor = worker ?: ThreadPoolExecutor(
@@ -62,13 +60,16 @@ class ToneEngine(
         ThreadPoolExecutor.DiscardOldestPolicy()
     )
 
-    /** Renders and plays `pitches` with `gapMs` of silence after each note. Returns immediately. */
-    fun play(pitches: List<Pitch>, noteMs: Int, gapMs: Int) {
-        val phrase = pitches.toList()
+    /** Renders (or looks up) `phrase` and starts it. Returns immediately. */
+    fun play(phrase: Phrase) {
         executor.execute {
-            runCatching { sink.play(ToneSynthesizer.sequence(phrase, noteMs, gapMs, sampleRate), sampleRate) }
+            runCatching { sink.play(cache.samples(phrase), sampleRate) }
         }
     }
+
+    /** Convenience for the common "one note" and "a scale with a long final note" cases. */
+    fun play(pitches: List<Pitch>, noteMs: Int, gapMs: Int, lastNoteMs: Int = noteMs): Unit =
+        play(Phrase(pitches.toList(), noteMs, gapMs, lastNoteMs))
 
     fun shutdown() {
         (executor as? ExecutorService)?.shutdownNow()
@@ -79,57 +80,84 @@ class ToneEngine(
         /** How many phrases may wait for a worker before the oldest is dropped. */
         const val MAX_BACKLOG = 4
 
-        /** A note rings for hundreds of milliseconds; a second worker keeps the next key snappy. */
+        /** Two workers, so one phrase can be rendering while another starts. */
         const val WORKERS = 2
     }
 }
 
 /**
- * The real sink: one short-lived [AudioTrack] per phrase, in static mode, released once the sound
- * has rung out.
+ * The real sink: a fixed set of [AudioTrack]s, one per voice, so notes ring into each other.
  *
- * Static mode is the right fit for a note of a few hundred milliseconds — the whole buffer is
- * written up front and the track just plays it. Sounds go to the *media* stream
- * ([AudioAttributes.USAGE_MEDIA]), the stream a musical toy belongs on, so the volume keys and the
- * user's media volume control it.
+ * Each voice is a static track — the whole note is written up front and the track just plays it,
+ * which is the cheapest way to start a note *now*: no streaming buffer sits between the key press
+ * and the sound. Starting a note never stops another one; a voice is only reused once its note would
+ * have finished, or — when all [voiceCount] voices are ringing — the voice that is closest to
+ * falling silent, because losing the oldest tail is much less noticeable than losing the note just
+ * played.
  *
- * Starting a phrase **cuts** whatever is still ringing, the way striking a bar again does, and the
- * track is stopped by identity: the worker that is still sleeping off the *previous* phrase must not
- * silence the one that replaced it.
+ * Sounds go to the *media* stream ([AudioAttributes.USAGE_MEDIA]), the stream a musical toy belongs
+ * on, so the volume keys and the user's media volume control it.
+ *
+ * Note that overlapping notes are mixed by the system, not here: with several voices ringing at once
+ * the sum can momentarily reach full scale. Keeping the per-note peak where it is and capping the
+ * voices is the trade this sink makes for a keypad that never delays a note — see the README.
  */
-class AudioTrackSink : AudioSink {
+class PolyphonicAudioSink(val voiceCount: Int = DEFAULT_VOICE_COUNT) : AudioSink {
 
     private val lock = Any()
-    private var playing: AudioTrack? = null
+    private val pool = VoicePool(voiceCount)
+    private val voices = arrayOfNulls<AudioTrack>(voiceCount)
 
     override fun play(samples: ShortArray, sampleRate: Int) {
-        val track = buildTrack(samples, sampleRate)
-        track.write(samples, 0, samples.size)
+        synchronized(lock) {
+            val now = SystemClock.uptimeMillis()
+            val durationMs = samples.size * 1000L / sampleRate
+            val voice = pool.acquire(now, durationMs)
 
-        val previous = synchronized(lock) {
-            playing.also { playing = track }
+            val track = trackFor(voice, samples.size, sampleRate)
+            // a static track has to be stopped before its buffer may be rewritten
+            runCatching { track.stop() }
+            track.write(samples, 0, samples.size)
+            track.play()
         }
-        stopQuietly(previous)
-
-        track.play()
-        SystemClock.sleep(samples.size * 1000L / sampleRate + RING_OUT_MARGIN_MS)
-
-        val stillCurrent = synchronized(lock) {
-            if (playing === track) {
-                playing = null
-                true
-            } else {
-                false // a newer phrase took over while this one was ringing
-            }
-        }
-        if (stillCurrent) stopQuietly(track)
     }
+
+    /** How many voices are ringing right now; the tests and diagnostics use it. */
+    fun soundingVoices(): Int = synchronized(lock) { pool.sounding(SystemClock.uptimeMillis()) }
 
     override fun release() {
-        stopQuietly(synchronized(lock) { playing.also { playing = null } })
+        synchronized(lock) {
+            voices.forEach { track ->
+                track ?: return@forEach
+                runCatching { track.stop() }
+                runCatching { track.release() }
+            }
+            voices.fill(null)
+            pool.reset()
+        }
     }
 
-    private fun buildTrack(samples: ShortArray, sampleRate: Int): AudioTrack =
+    /**
+     * The voice's track, built on first use and rebuilt only if a longer note arrives than it has
+     * room for. The buffer is sized to the note, so the first tap of a new length pays for one track
+     * — a few milliseconds, once.
+     */
+    private fun trackFor(voice: Int, sampleCount: Int, sampleRate: Int): AudioTrack {
+        val required = sampleCount * Short.SIZE_BYTES
+        val existing = voices[voice]
+        if (existing != null && existing.state == AudioTrack.STATE_INITIALIZED &&
+            existing.bufferSizeInFrames * Short.SIZE_BYTES >= required
+        ) {
+            return existing
+        }
+        existing?.let {
+            runCatching { it.stop() }
+            runCatching { it.release() }
+        }
+        return buildTrack(required, sampleRate).also { voices[voice] = it }
+    }
+
+    private fun buildTrack(bufferSizeBytes: Int, sampleRate: Int): AudioTrack =
         AudioTrack.Builder()
             .setAudioAttributes(
                 AudioAttributes.Builder()
@@ -145,17 +173,14 @@ class AudioTrackSink : AudioSink {
                     .build()
             )
             .setTransferMode(AudioTrack.MODE_STATIC)
-            .setBufferSizeInBytes(samples.size * Short.SIZE_BYTES)
+            .setBufferSizeInBytes(bufferSizeBytes)
             .build()
 
-    private fun stopQuietly(track: AudioTrack?) {
-        track ?: return
-        runCatching { track.stop() }
-        runCatching { track.release() }
-    }
-
-    private companion object {
-        /** A little slack after the buffer, so the tail is not cut off. */
-        const val RING_OUT_MARGIN_MS = 20L
+    companion object {
+        /**
+         * Six voices: enough for a scale to ring over itself and for a quick run of key presses,
+         * without holding more audio buffers than a phone needs for a keypad.
+         */
+        const val DEFAULT_VOICE_COUNT = 6
     }
 }

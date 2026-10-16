@@ -10,17 +10,37 @@ class ToneEngineTest {
 
     private val sampleRate = ToneSynthesizer.SAMPLE_RATE
 
+    /** What the sink was handed, in order. */
+    private fun phrase(noteMs: Int = 40, gapMs: Int = 0, lastNoteMs: Int = noteMs) =
+        Phrase(Melodies.SOLVE_SCALE, noteMs, gapMs, lastNoteMs)
+
     @Test
     fun aPhraseReachesTheSinkAsOneBuffer() {
         val sink = RecordingSink()
         val engine = ToneEngine(sink, sampleRate, directExecutor)
 
-        engine.play(Melodies.SOLVE_SCALE, noteMs = 40, gapMs = 10)
+        engine.play(phrase(noteMs = 40, gapMs = 10))
 
         assertEquals(1, sink.played.size)
-        assertEquals(
-            ToneSynthesizer.samplesFor(50, sampleRate) * Melodies.SOLVE_SCALE.size,
-            sink.sampleCounts.single()
+        val expected = ToneSynthesizer.samplesFor(50, sampleRate) * (Melodies.SOLVE_SCALE.size - 1) +
+            ToneSynthesizer.samplesFor(40, sampleRate)
+        assertEquals(expected, sink.sampleCounts.single())
+    }
+
+    @Test
+    fun thePhraseIsRenderedOnceAndReused() {
+        val sink = RecordingSink()
+        val engine = ToneEngine(sink, sampleRate, directExecutor)
+        val same = phrase()
+
+        engine.play(same)
+        val first = sink.played.single()
+        engine.play(same)
+
+        assertEquals(2, sink.played.size)
+        assertTrue(
+            "the same phrase should be handed over from the cache, not rendered again",
+            first === sink.played[1]
         )
     }
 
@@ -29,7 +49,7 @@ class ToneEngineTest {
         val sink = RecordingSink()
         val engine = ToneEngine(sink, sampleRate, directExecutor)
 
-        repeat(3) { engine.play(listOf(Pitch.C4), noteMs = 20, gapMs = 0) }
+        repeat(3) { engine.play(Phrase(listOf(Pitch.C4), noteMs = 20)) }
 
         assertEquals(3, sink.played.size)
         assertEquals(
@@ -45,7 +65,7 @@ class ToneEngineTest {
         val engine = ToneEngine(sink, sampleRate)
 
         val start = System.nanoTime()
-        engine.play(Melodies.SOLVE_SCALE, noteMs = 200, gapMs = 80)
+        engine.play(phrase(noteMs = 200, gapMs = 80, lastNoteMs = 1_200))
         val elapsedMs = (System.nanoTime() - start) / 1_000_000
 
         assertTrue(
@@ -66,8 +86,8 @@ class ToneEngineTest {
         }
         val engine = ToneEngine(slowSink, sampleRate)
 
-        engine.play(listOf(Pitch.C4), noteMs = 50, gapMs = 0)
-        engine.play(listOf(Pitch.D4), noteMs = 50, gapMs = 0)
+        engine.play(Phrase(listOf(Pitch.C4), noteMs = 50))
+        engine.play(Phrase(listOf(Pitch.D4), noteMs = 50))
 
         assertTrue(
             "the second phrase had to wait for the first one to finish ringing",
@@ -83,7 +103,7 @@ class ToneEngineTest {
         }
         val engine = ToneEngine(exploding, sampleRate, directExecutor)
 
-        engine.play(Melodies.KEYPAD_NOTES, noteMs = 10, gapMs = 0)
+        engine.play(Phrase(Melodies.KEYPAD_NOTES, noteMs = 10))
 
         engine.shutdown() // nothing thrown, nothing left behind
     }

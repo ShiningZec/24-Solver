@@ -14,6 +14,14 @@ import kotlin.math.pow
  * number, so a new note cannot end up a few cents out because of a typo in a decimal, and it is
  * obvious at a glance that the table has no gaps (`56, 57, 58, …`).
  *
+ * **Do not delete notes that nothing currently refers to.** The table is a complete, gap-free
+ * chromatic scale on purpose: it is the palette [Melodies] picks from, and the whole point is that
+ * swapping a scale — or making one key play a different single note — is a matter of naming another
+ * constant. The note you want is already here and already tuned, whether or not anything uses it
+ * today. An unused note costs one line and nothing at runtime; deleting it costs whoever comes next
+ * the job of working its frequency out again. `PitchTest` enforces the completeness, so removing one
+ * fails the build instead of passing unnoticed.
+ *
  * Spellings follow the ones already used across the app: sharps for F#/G#/C#, flats for Bb/Eb. That
  * is why the bottom note is `Ab3` while the note an octave above it is `G_SHARP4` — they are the same
  * pitch class under two names.
@@ -32,6 +40,7 @@ enum class Pitch(val noteName: String, val midiNumber: Int) {
     F_SHARP4("F#4", 66),
     G4("G4", 67),
     G_SHARP4("G#4", 68),
+    A_FLAT4("Ab4", 68),
     A4("A4", 69),
     B_FLAT4("Bb4", 70),
     B4("B4", 71),

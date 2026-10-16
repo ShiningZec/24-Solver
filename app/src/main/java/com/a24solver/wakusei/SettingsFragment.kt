@@ -4,6 +4,7 @@ import android.os.Bundle
 import android.view.LayoutInflater
 import android.view.View
 import android.view.ViewGroup
+import android.widget.Toast
 import androidx.fragment.app.Fragment
 import androidx.core.widget.doAfterTextChanged
 import com.a24solver.wakusei.databinding.FragmentSettingsBinding
@@ -56,8 +57,36 @@ class SettingsFragment : Fragment() {
         val languages = AppLanguage.entries
         binding.dropdownLanguage.setSimpleItems(languages.map { getString(it.labelRes) }.toTypedArray())
         binding.dropdownLanguage.setOnItemClickListener { _, _, position, _ ->
-            // persists the choice and switches the running app over to it
-            settings.applyLanguage(languages[position])
+            val chosen = languages[position]
+            val wasPending = settings.requestedLanguage != settings.activeLanguage
+            // Only records the choice: the switch happens at the next start (see WakuseiApplication)
+            settings.requestLanguage(chosen)
+            renderLanguage()
+            if (!wasPending && settings.languageChangeIsPending) {
+                // the first time this becomes a pending change, say so; a Toast rather than a dialog,
+                // because nothing is being taken away from the user
+                Toast.makeText(
+                    requireContext(),
+                    getString(R.string.msg_language_pending),
+                    Toast.LENGTH_SHORT
+                ).show()
+            }
+        }
+    }
+
+    /**
+     * Shows which language is on screen and, when they differ, which one is waiting for a restart.
+     */
+    private fun renderLanguage() {
+        val active = getString(settings.activeLanguage.labelRes)
+        val requested = getString(settings.requestedLanguage.labelRes)
+
+        binding.dropdownLanguage.setText(requested, false)
+        binding.textLanguageStatus.text = if (settings.languageChangeIsPending) {
+            getString(R.string.settings_language_active, active) + "\n" +
+                getString(R.string.settings_language_pending, requested)
+        } else {
+            getString(R.string.settings_language_active, active)
         }
     }
 
@@ -133,12 +162,11 @@ class SettingsFragment : Fragment() {
     // --------------------------------------------------------------- render
 
     private fun render() {
-        val language = settings.language
         val preset = settings.defaultTargetPreset
         val custom = preset.isCustom
 
         syncing = true
-        binding.dropdownLanguage.setText(getString(language.labelRes), false)
+        renderLanguage()
         binding.sliderDefaultTarget.value = preset.ordinal.toFloat()
         // Locale.ROOT on purpose: this text goes straight back through toIntOrNull(), so it has to
         // stay ASCII digits even in a locale that would otherwise render its own numerals

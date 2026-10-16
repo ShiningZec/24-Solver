@@ -2,9 +2,9 @@ package com.a24solver.wakusei.solver
 
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
-import org.junit.Assume.assumeTrue
 import org.junit.Test
 import java.io.File
+import java.util.jar.JarFile
 
 /**
  * Guards the one architectural promise the solver makes: `com.a24solver.wakusei.solver` is plain
@@ -23,52 +23,67 @@ class SolverPurityTest {
 
     @Test
     fun theSolverPackageDoesNotReferenceAndroid() {
-        val classes = solverClassFiles()
-        assumeTrue(
-            "the compiled solver is not on disk as a directory in this runtime",
-            classes.isNotEmpty()
-        )
+        val classes = solverClasses()
+
+        // A test that cannot see the code it guards would pass while proving nothing, so this is a
+        // failure rather than an assumption: the classes are on disk either as a directory or inside
+        // a jar, and both are handled below.
+        assertTrue("could not find the compiled solver classes to scan", classes.isNotEmpty())
 
         // assembled at runtime so this test's own class file cannot match its own needles
         val androidPackages = listOf("android", "androidx").map { "$it/" }
 
-        for (file in classes) {
-            val constantPool = String(file.readBytes(), Charsets.ISO_8859_1)
+        for ((name, bytes) in classes) {
+            val constantPool = String(bytes, Charsets.ISO_8859_1)
             for (packageName in androidPackages) {
                 assertFalse(
-                    "${file.name} references $packageName — the solver package must stay " +
-                        "framework-free so it can run on a bare JVM",
+                    "$name references $packageName — the solver package must stay framework-free " +
+                        "so it can run on a bare JVM",
                     constantPool.contains(packageName)
                 )
             }
+            assertTrue(
+                "$name does not look like a class file, so the scan proves nothing",
+                constantPool.contains("java/lang")
+            )
         }
 
-        assertTrue("expected the solver to be several classes", classes.size >= 3)
         assertTrue(
-            "the scan did not find class metadata, so it proves nothing",
-            classes.any { String(it.readBytes(), Charsets.ISO_8859_1).contains("java/lang") }
+            "expected the solver to be several classes, scanned ${classes.size}",
+            classes.size >= 3
         )
     }
 
     /**
-     * The production `solver` package as compiled class files, located through the code source of
-     * [Solver] itself — *not* through the classloader, which would also hand back this test's own
-     * classes from the very same package.
+     * The production `solver` package as class files, located through the code source of [Solver]
+     * itself — *not* through the classloader, which would also hand back this test's own classes from
+     * the very same package. Handles both shapes the build can hand over: a directory of classes and
+     * a jar.
      */
-    private fun solverClassFiles(): List<File> {
+    private fun solverClasses(): Map<String, ByteArray> {
         val packagePath = "com/a24solver/wakusei/solver"
-        val classesRoot = Solver::class.java.protectionDomain
-            ?.codeSource
-            ?.location
-            ?.let { runCatching { File(it.toURI()) }.getOrNull() }
-            ?: return emptyList()
+        val location = Solver::class.java.protectionDomain?.codeSource?.location ?: return emptyMap()
+        val source = runCatching { File(location.toURI()) }.getOrNull() ?: return emptyMap()
 
-        val packageDirectory =
-            if (classesRoot.name == "solver") classesRoot else File(classesRoot, packagePath)
-        if (!packageDirectory.isDirectory) return emptyList()
+        return when {
+            source.isDirectory -> {
+                val directory =
+                    if (source.name == "solver") source else File(source, packagePath)
+                directory.listFiles { file: File ->
+                    file.extension == "class" && !file.name.endsWith("Test.class")
+                }?.associate { it.name to it.readBytes() }.orEmpty()
+            }
 
-        return packageDirectory.listFiles { file: File ->
-            file.extension == "class" && !file.name.endsWith("Test.class")
-        }?.toList().orEmpty()
+            source.isFile -> JarFile(source).use { jar ->
+                jar.entries().asSequence()
+                    .filter { it.name.startsWith("$packagePath/") && it.name.endsWith(".class") }
+                    .filterNot { it.name.endsWith("Test.class") }
+                    .associate { entry ->
+                        entry.name.substringAfterLast('/') to jar.getInputStream(entry).readBytes()
+                    }
+            }
+
+            else -> emptyMap()
+        }
     }
 }

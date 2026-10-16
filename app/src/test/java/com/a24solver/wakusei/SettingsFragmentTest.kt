@@ -28,6 +28,7 @@ import org.robolectric.RobolectricTestRunner
 import org.robolectric.RuntimeEnvironment
 import org.robolectric.Shadows.shadowOf
 import org.robolectric.android.controller.ActivityController
+import org.robolectric.shadows.ShadowToast
 import org.robolectric.annotation.Config
 
 /**
@@ -107,33 +108,53 @@ class SettingsFragmentTest {
     // -------------------------------------------------------------- language
 
     @Test
-    fun choosingALanguageStoresItAndSwitchesTheApp() {
+    fun choosingALanguageIsRecordedButWaitsForTheNextStart() {
         openSettings()
 
         selectLanguage(AppLanguage.JAPANESE.ordinal)
 
-        assertEquals(AppLanguage.JAPANESE, settings().language)
+        assertEquals(AppLanguage.JAPANESE, settings().requestedLanguage)
+        assertEquals(
+            "the running app must not switch language on the spot, was " +
+                "${AppCompatDelegate.getApplicationLocales()}",
+            "",
+            AppCompatDelegate.getApplicationLocales().toLanguageTags()
+        )
+        assertTrue(settings().languageChangeIsPending)
         assertTrue(
-            "the app locale should be Japanese, was ${AppCompatDelegate.getApplicationLocales()}",
-            AppCompatDelegate.getApplicationLocales().toLanguageTags().startsWith("ja")
+            "the screen should say which language is in use and which is waiting",
+            status().contains("Follow system") && status().contains("日本語")
+        )
+        assertTrue(
+            "the user should be told it takes effect at the next start",
+            ShadowToast.getTextOfLatestToast().contains("next time the app starts")
         )
     }
 
     @Test
-    fun followingTheSystemAgainClearsTheChoice() {
+    fun thePendingChoiceIsStillShownInTheList() {
+        openSettings()
+        selectLanguage(AppLanguage.JAPANESE.ordinal)
+
+        assertEquals("日本語", dropdown.text.toString())
+        assertTrue(status().startsWith("In use now: Follow system"))
+    }
+
+    @Test
+    fun followingTheSystemAgainClearsThePendingChoice() {
         openSettings()
         selectLanguage(AppLanguage.CHINESE.ordinal)
-        assertEquals(AppLanguage.CHINESE, settings().language)
+        assertEquals(AppLanguage.CHINESE, settings().requestedLanguage)
 
         selectLanguage(AppLanguage.SYSTEM.ordinal)
 
-        assertEquals(AppLanguage.SYSTEM, settings().language)
-        assertEquals(
-            "an empty locale list means 'follow the system'",
-            "",
-            AppCompatDelegate.getApplicationLocales().toLanguageTags()
-        )
+        assertEquals(AppLanguage.SYSTEM, settings().requestedLanguage)
+        assertFalse(settings().languageChangeIsPending)
+        assertEquals("In use now: Follow system", status())
     }
+
+    private fun status(): String =
+        view<android.widget.TextView>(R.id.text_language_status).text.toString()
 
     private fun selectLanguage(position: Int) {
         val listener = requireNotNull(dropdown.onItemClickListener) { "the list has no listener" }

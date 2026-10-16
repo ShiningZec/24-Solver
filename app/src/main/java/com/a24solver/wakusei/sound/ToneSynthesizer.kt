@@ -72,22 +72,28 @@ object ToneSynthesizer {
         ShortArray(samplesFor(durationMs, sampleRate))
 
     /**
-     * [pitches] played one after another, each `noteMs` long with `gapMs` of silence behind it, as
-     * a single buffer — the whole phrase is handed to the audio device in one write.
+     * [pitches] played one after another, each `noteMs` long with `gapMs` of silence behind it,
+     * except the last one, which lasts [lastNoteMs] — a longer final note lets a scale ring out
+     * instead of stopping dead, and reads as a full stop. There is no silence after the last note:
+     * the voice ends when the sound does.
      */
-    fun sequence(
+    fun phrase(
         pitches: List<Pitch>,
         noteMs: Int,
         gapMs: Int,
+        lastNoteMs: Int = noteMs,
         sampleRate: Int = SAMPLE_RATE
     ): ShortArray {
-        require(pitches.isNotEmpty()) { "A sequence needs at least one note" }
-        require(noteMs > 0 && gapMs >= 0) { "A sequence needs a positive note length" }
-        val note = samplesFor(noteMs, sampleRate)
-        val gap = samplesFor(gapMs, sampleRate)
-        val out = ShortArray((note + gap) * pitches.size)
+        require(pitches.isNotEmpty()) { "A phrase needs at least one note" }
+        require(noteMs > 0 && gapMs >= 0 && lastNoteMs > 0) {
+            "A phrase needs positive note lengths"
+        }
+        val step = samplesFor(noteMs + gapMs, sampleRate)
+        val last = samplesFor(lastNoteMs, sampleRate)
+        val out = ShortArray(step * (pitches.size - 1) + last)
         pitches.forEachIndexed { index, pitch ->
-            note(pitch, noteMs, sampleRate).copyInto(out, index * (note + gap))
+            val durationMs = if (index == pitches.lastIndex) lastNoteMs else noteMs
+            note(pitch, durationMs, sampleRate).copyInto(out, index * step)
         }
         return out
     }
