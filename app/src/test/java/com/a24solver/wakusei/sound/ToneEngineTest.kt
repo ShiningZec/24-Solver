@@ -3,6 +3,8 @@ package com.a24solver.wakusei.sound
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
 import org.junit.Test
+import java.util.concurrent.CountDownLatch
+import java.util.concurrent.TimeUnit
 
 class ToneEngineTest {
 
@@ -49,6 +51,27 @@ class ToneEngineTest {
         assertTrue(
             "play() blocked for $elapsedMs ms; audio must never hold up the caller",
             elapsedMs < 100
+        )
+        engine.shutdown()
+    }
+
+    @Test(timeout = 10_000)
+    fun aSecondPhraseDoesNotWaitForTheFirstToStopRinging() {
+        val bothStarted = CountDownLatch(2)
+        val slowSink = object : AudioSink {
+            override fun play(samples: ShortArray, sampleRate: Int) {
+                bothStarted.countDown()
+                Thread.sleep(300) // as long as a note rings
+            }
+        }
+        val engine = ToneEngine(slowSink, sampleRate)
+
+        engine.play(listOf(Pitch.C4), noteMs = 50, gapMs = 0)
+        engine.play(listOf(Pitch.D4), noteMs = 50, gapMs = 0)
+
+        assertTrue(
+            "the second phrase had to wait for the first one to finish ringing",
+            bothStarted.await(250, TimeUnit.MILLISECONDS)
         )
         engine.shutdown()
     }

@@ -26,12 +26,17 @@ interface AudioSink {
 }
 
 /**
- * Plays a phrase of notes on a background worker.
+ * Plays a phrase of notes on background workers.
  *
- * [play] never blocks the caller: it renders nothing on the calling thread and hands the work to a
- * single worker, which is what keeps a key press from ever waiting on audio. The worker queue is
- * deliberately short and keeps the *newest* phrases, so hammering the keypad plays the latest notes
- * instead of falling further and further behind.
+ * [play] never blocks the caller: it renders nothing on the calling thread and hands the work to
+ * the workers, which is what keeps a key press from ever waiting on audio. The queue is deliberately
+ * short and keeps the *newest* phrases, so hammering the keypad plays the latest notes instead of
+ * falling further and further behind.
+ *
+ * Two workers rather than one, because a note rings for a few hundred milliseconds: with a single
+ * worker the next key press would have to wait for the previous note to finish ringing, and a
+ * quick run of keys would sound like an echo of itself. The sink itself makes sure only one note is
+ * audible at a time by cutting the previous one (see [AudioTrackSink]).
  *
  * Failures are swallowed on purpose: a device without a usable audio output must not be able to
  * break the puzzle.
@@ -43,8 +48,8 @@ class ToneEngine(
 ) {
 
     private val executor: Executor = worker ?: ThreadPoolExecutor(
-        1,
-        1,
+        WORKERS,
+        WORKERS,
         0L,
         TimeUnit.MILLISECONDS,
         ArrayBlockingQueue(MAX_BACKLOG),
@@ -71,8 +76,11 @@ class ToneEngine(
     }
 
     private companion object {
-        /** How many phrases may wait for the worker before the oldest is dropped. */
+        /** How many phrases may wait for a worker before the oldest is dropped. */
         const val MAX_BACKLOG = 4
+
+        /** A note rings for hundreds of milliseconds; a second worker keeps the next key snappy. */
+        const val WORKERS = 2
     }
 }
 
@@ -84,14 +92,45 @@ class ToneEngine(
  * written up front and the track just plays it. Sounds go to the *media* stream
  * ([AudioAttributes.USAGE_MEDIA]), the stream a musical toy belongs on, so the volume keys and the
  * user's media volume control it.
+ *
+ * Starting a phrase **cuts** whatever is still ringing, the way striking a bar again does, and the
+ * track is stopped by identity: the worker that is still sleeping off the *previous* phrase must not
+ * silence the one that replaced it.
  */
 class AudioTrackSink : AudioSink {
 
+    private val lock = Any()
     private var playing: AudioTrack? = null
 
     override fun play(samples: ShortArray, sampleRate: Int) {
-        stop()
-        val track = AudioTrack.Builder()
+        val track = buildTrack(samples, sampleRate)
+        track.write(samples, 0, samples.size)
+
+        val previous = synchronized(lock) {
+            playing.also { playing = track }
+        }
+        stopQuietly(previous)
+
+        track.play()
+        SystemClock.sleep(samples.size * 1000L / sampleRate + RING_OUT_MARGIN_MS)
+
+        val stillCurrent = synchronized(lock) {
+            if (playing === track) {
+                playing = null
+                true
+            } else {
+                false // a newer phrase took over while this one was ringing
+            }
+        }
+        if (stillCurrent) stopQuietly(track)
+    }
+
+    override fun release() {
+        stopQuietly(synchronized(lock) { playing.also { playing = null } })
+    }
+
+    private fun buildTrack(samples: ShortArray, sampleRate: Int): AudioTrack =
+        AudioTrack.Builder()
             .setAudioAttributes(
                 AudioAttributes.Builder()
                     .setUsage(AudioAttributes.USAGE_MEDIA)
@@ -109,21 +148,10 @@ class AudioTrackSink : AudioSink {
             .setBufferSizeInBytes(samples.size * Short.SIZE_BYTES)
             .build()
 
-        track.write(samples, 0, samples.size)
-        playing = track
-        track.play()
-        SystemClock.sleep(samples.size * 1000L / sampleRate + RING_OUT_MARGIN_MS)
-        stop()
-    }
-
-    override fun release() = stop()
-
-    private fun stop() {
-        playing?.let { track ->
-            runCatching { track.stop() }
-            runCatching { track.release() }
-        }
-        playing = null
+    private fun stopQuietly(track: AudioTrack?) {
+        track ?: return
+        runCatching { track.stop() }
+        runCatching { track.release() }
     }
 
     private companion object {
