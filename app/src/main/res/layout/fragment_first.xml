@@ -39,13 +39,19 @@
          space the rows used to fill (the last unit is the spacer below), so every key ends up
          roughly 80% as tall as before while its label stays fully readable.
          Keys carry horizontal margins for the left/right gaps; label size and the rose background
-         come from res/values/styles.xml. -->
+         come from res/values/styles.xml.
+
+         NestedWeights is suppressed on purpose: weight inside weight is exactly what "five equal
+         rows filling a fixed share of the free space" means, the hierarchy is five rows deep and
+         never changes, and the extra measure pass is negligible next to a grid that would reflow
+         differently in landscape. -->
     <LinearLayout
         android:id="@+id/keypad"
         android:layout_width="match_parent"
         android:layout_height="0dp"
         android:layout_weight="4"
-        android:orientation="vertical">
+        android:orientation="vertical"
+        tools:ignore="NestedWeights">
 
         <LinearLayout
             android:layout_width="match_parent"
@@ -61,7 +67,7 @@
                 android:layout_marginStart="4dp"
                 android:layout_marginEnd="4dp"
                 android:layout_weight="1"
-                android:text="1" />
+                android:text="@string/digit_1" />
 
             <Button
                 android:id="@+id/button2"
@@ -71,7 +77,7 @@
                 android:layout_marginStart="4dp"
                 android:layout_marginEnd="4dp"
                 android:layout_weight="1"
-                android:text="2" />
+                android:text="@string/digit_2" />
 
             <Button
                 android:id="@+id/button3"
@@ -81,7 +87,7 @@
                 android:layout_marginStart="4dp"
                 android:layout_marginEnd="4dp"
                 android:layout_weight="1"
-                android:text="3" />
+                android:text="@string/digit_3" />
         </LinearLayout>
 
         <LinearLayout
@@ -98,7 +104,7 @@
                 android:layout_marginStart="4dp"
                 android:layout_marginEnd="4dp"
                 android:layout_weight="1"
-                android:text="4" />
+                android:text="@string/digit_4" />
 
             <Button
                 android:id="@+id/button5"
@@ -108,7 +114,7 @@
                 android:layout_marginStart="4dp"
                 android:layout_marginEnd="4dp"
                 android:layout_weight="1"
-                android:text="5" />
+                android:text="@string/digit_5" />
 
             <Button
                 android:id="@+id/button6"
@@ -118,7 +124,7 @@
                 android:layout_marginStart="4dp"
                 android:layout_marginEnd="4dp"
                 android:layout_weight="1"
-                android:text="6" />
+                android:text="@string/digit_6" />
         </LinearLayout>
 
         <LinearLayout
@@ -135,7 +141,7 @@
                 android:layout_marginStart="4dp"
                 android:layout_marginEnd="4dp"
                 android:layout_weight="1"
-                android:text="7" />
+                android:text="@string/digit_7" />
 
             <Button
                 android:id="@+id/button8"
@@ -145,7 +151,7 @@
                 android:layout_marginStart="4dp"
                 android:layout_marginEnd="4dp"
                 android:layout_weight="1"
-                android:text="8" />
+                android:text="@string/digit_8" />
 
             <Button
                 android:id="@+id/button9"
@@ -155,7 +161,7 @@
                 android:layout_marginStart="4dp"
                 android:layout_marginEnd="4dp"
                 android:layout_weight="1"
-                android:text="9" />
+                android:text="@string/digit_9" />
         </LinearLayout>
 
         <!-- 4th row: [+/-] negates the value being typed, 0, and NEXT which commits it. -->
@@ -183,7 +189,7 @@
                 android:layout_marginStart="4dp"
                 android:layout_marginEnd="4dp"
                 android:layout_weight="1"
-                android:text="0" />
+                android:text="@string/digit_0" />
 
             <Button
                 android:id="@+id/button_next"

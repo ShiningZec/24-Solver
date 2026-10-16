@@ -2,6 +2,8 @@
 
 24 Solver finds **every** way to reach a target number (24 by default) from the numbers you type.
 Each number is used exactly once, with `+ - × ÷` and any bracketing, and every solution is listed.
+Since 1.1 it also groups the answers, so you can see how many *genuinely different* solutions there
+are.
 
 ## The screen, top to bottom
 
@@ -29,6 +31,9 @@ Press `NEXT` to keep the number: `INPUT` clears and the number appears in `NUMBE
 You can enter up to **five** numbers, each with **|value| < 256**; anything else is refused with a
 short message and left in the input line so you can correct it.
 
+Whatever you have typed but not confirmed is **not lost** when the screen rotates — the numbers, the
+target, the line you were typing and the TARGET key all come back exactly as they were.
+
 ## Solving for a different target
 
 Tap `TARGET`. The key stays lit and the keypad now types the target instead of numbers — the
@@ -51,9 +56,29 @@ Tap `TARGET`. The key stays lit and the keypad now types the target instead of n
 ## Solving
 
 Press `SOLVE`. The app checks the input, then works on a background thread: `TARGET:` shows
-*SOLVING…* and the button is disabled meanwhile. The result screen lists every expression found —
-for 1, 2, 3, 4 there are 242 of them — and `BACK` returns to the keypad, ready for the next puzzle.
-If nothing reaches the target you get *No expression built from these numbers reaches the target.*
+*SOLVING…* and the button is disabled meanwhile. `BACK` returns to the keypad, ready for the next
+puzzle. If nothing reaches the target you get
+*No expression built from these numbers reaches the target.*
+
+For 1, 2, 3, 4 and a target of 24 the result screen opens with **242** answers, listed simplest
+first — brackets are only printed where they change the meaning, so you read `(1 + 2 + 3) * 4`
+rather than `(((1 + 2) + 3) * 4)`.
+
+## All answers, or the genuinely different ones
+
+Most of those 242 answers are the same idea written differently: `12 + 13` and `13 + 12`, or
+`(1 + 2) + 3` and `1 + (2 + 3)`. The switch above the list lets you choose:
+
+| button | what you get |
+| --- | --- |
+| `All (242)` | every distinct expression the solver found |
+| `Essential (28)` | one answer per group of expressions that differ only by swapping or regrouping `+` and `*` |
+
+The counts on the buttons tell you what each choice contains, and your choice survives a rotation
+and a trip back to the keypad. When there is only one answer — or none — the switch hides itself,
+because there would be nothing to switch between. Note what "essential" does *not* do: it groups by
+the commutativity and associativity of `+` and `*` only, so `1 - (2 - 3)` and `1 - 2 + 3` are still
+listed separately even though both are the same value.
 
 ## Good to know
 
@@ -63,4 +88,11 @@ If nothing reaches the target you get *No expression built from these numbers re
 - The answer list is plain selectable text, one expression per line, so you can copy an expression
   out of it.
 - Every answer is exact — the solver computes with fractions, so results like `1 + 1/9` are real
-  answers rather than rounding artefacts.
+  answers rather than rounding artefacts. `8 / (3 - 8 / 3)` (from 3, 3, 8, 8) is a solution that
+  floating-point arithmetic cannot even recognise.
+- The interface is available in Chinese; the app follows your device language and falls back to
+  English.
+- Five numbers is the practical ceiling for listing *every* expression: beyond that the number of
+  expressions explodes (six numbers already have more than thirty million of them). The app caps the
+  input at five, and the solver refuses anything larger with a clear message rather than appearing to
+  hang.

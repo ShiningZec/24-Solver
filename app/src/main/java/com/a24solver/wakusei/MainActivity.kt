@@ -1,18 +1,12 @@
 package com.a24solver.wakusei
 
 import android.os.Bundle
-//import com.google.android.material.snackbar.Snackbar // only used by the (commented out) FAB
 import androidx.appcompat.app.AppCompatActivity
 import androidx.activity.enableEdgeToEdge
-import androidx.core.view.ViewCompat
-import androidx.core.view.WindowInsetsCompat
-import androidx.navigation.findNavController
 import androidx.navigation.fragment.NavHostFragment
 import androidx.navigation.ui.AppBarConfiguration
 import androidx.navigation.ui.navigateUp
 import androidx.navigation.ui.setupActionBarWithNavController
-import android.view.Menu
-import android.view.MenuItem
 import com.a24solver.wakusei.databinding.ActivityMainBinding
 
 /*
@@ -35,6 +29,16 @@ import com.a24solver.wakusei.databinding.ActivityMainBinding
 └─────────────────────────────┘
  */
 
+/**
+ * Single-activity shell: a [NavHostFragment] with the two screens of the app (input and results)
+ * and a 40dp toolbar that shows the current screen's title and the up arrow.
+ *
+ * Window insets are handled declaratively: the root layout and its app bar carry
+ * `android:fitsSystemWindows="true"`, which is what makes the content avoid the status and
+ * navigation bars under [enableEdgeToEdge]. There is deliberately no
+ * `ViewCompat.setOnApplyWindowInsetsListener` here as well — that would pad the same insets a
+ * second time and push the toolbar down by an extra status bar.
+ */
 class MainActivity : AppCompatActivity() {
 
     private lateinit var appBarConfiguration: AppBarConfiguration
@@ -47,16 +51,11 @@ class MainActivity : AppCompatActivity() {
         // The ads SDK is initialized defensively: see Ads — a failing ad SDK must never take the
         // app down, and the launch crash of MobileAdsInitProvider is prevented by the
         // APPLICATION_ID meta-data in AndroidManifest.xml rather than by code.
-        Ads.initialize(this)
+        Ads.initialize(applicationContext)
 
         binding = ActivityMainBinding.inflate(layoutInflater)
         setContentView(binding.root)
 
-        ViewCompat.setOnApplyWindowInsetsListener(binding.main) { v, insets ->
-            val systemBars = insets.getInsets(WindowInsetsCompat.Type.systemBars())
-            v.setPadding(systemBars.left, systemBars.top, systemBars.right, systemBars.bottom)
-            insets
-        }
         setSupportActionBar(binding.toolbar)
 
         val navHostFragment =
@@ -65,35 +64,12 @@ class MainActivity : AppCompatActivity() {
 
         appBarConfiguration = AppBarConfiguration(navController.graph)
         setupActionBarWithNavController(navController, appBarConfiguration)
-
-        // Floating action button: unused template hook, commented out together with the FAB
-        // itself in activity_main.xml.
-        // binding.fab.setOnClickListener { view ->
-        //     Snackbar.make(view, "Replace with your own action", Snackbar.LENGTH_LONG)
-        //         .setAction("Action", null)
-        //         .setAnchorView(R.id.fab).show()
-        // }
-    }
-
-    override fun onCreateOptionsMenu(menu: Menu): Boolean {
-        // Inflate the menu; this adds items to the action bar if it is present.
-        menuInflater.inflate(R.menu.menu_main, menu)
-        return true
-    }
-
-    override fun onOptionsItemSelected(item: MenuItem): Boolean {
-        // Handle action bar item clicks here. The action bar will
-        // automatically handle clicks on the Home/Up button, so long
-        // as you specify a parent activity in AndroidManifest.xml.
-        return when (item.itemId) {
-            R.id.action_settings -> true
-            else -> super.onOptionsItemSelected(item)
-        }
     }
 
     override fun onSupportNavigateUp(): Boolean {
-        val navController = findNavController(R.id.nav_host_fragment_content_main)
-        return navController.navigateUp(appBarConfiguration)
+        val navHostFragment =
+            supportFragmentManager.findFragmentById(R.id.nav_host_fragment_content_main) as NavHostFragment
+        return navHostFragment.navController.navigateUp(appBarConfiguration)
                 || super.onSupportNavigateUp()
     }
 }

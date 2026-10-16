@@ -1,15 +1,16 @@
 # 24 Solver (Wakusei)
 
-一个 Android + Kotlin 的「24 点」求解器：给定一组数字和一个目标值，**穷举出全部可能的解表达式**。
+一个 Android + Kotlin 的「24 点」求解器：给定一组数字和一个目标值，**穷举出全部可能的解表达式**，
+并可以把结果收拢成「本质不同」的解。
 
 - 模块：`:app`（Android Application），包名 `com.a24solver.wakusei`
-- 语言 / 工具链：Kotlin，Gradle (KTS)，AGP 9.4 / Gradle 9.6，`minSdk 24`，`compileSdk/targetSdk 37`，Java 11（字节码），viewBinding，Material 3
+- 语言 / 工具链：Kotlin（AGP 9 内置 Kotlin 支持），Gradle (KTS)，AGP 9.4 / Gradle 9.6，
+  `minSdk 24`，`compileSdk/targetSdk 37`，Java 11（字节码），viewBinding，Material 3
 - 应用名（`app_name`）：**24 Solver**；Gradle 根项目名：`24 Solver`
 - 文档：
   - 本文件：项目状态、求解原理、界面实现、局限与 TODO
   - [`TUTORIAL.md`](TUTORIAL.md)：面向使用者的简短交互说明书（en-US）
-  - `diff_[time]_[date].MD`：逐轮改动的真实 git diff 记录
-- 文档日期：2026-09-29
+- 文档日期：2026-10-16
 
 ---
 
@@ -22,72 +23,82 @@
 > 给定 `n` 个数（`1 ≤ n ≤ 8`，每个数的绝对值 `< 256`）和一个目标值 `target`，
 > **把每个数恰好使用一次**，用 `+ - * /` 和任意加括号方式，列出**所有**能得到 `target` 的表达式。
 
-名字叫 24 Solver（默认目标是 24），但 `target` 是入参，任何整数目标都能求解（例如 `target=60`）。数字在 API 层面允许负数（界面用 `[+/-]` 键输入）。
+名字叫 24 Solver（默认目标是 24），但 `target` 是入参，任何整数目标都能求解（例如 `target=60`）。
+数字在 API 层面允许负数（界面用 `[+/-]` 键输入）。
 
-关键词是「**全部**」：不是「找到一个就返回」，而是**完全枚举**——不剪枝、不启发式，只要不漏解。运算全程使用自己实现的有理数类，因此 `(1 + 1/9) * 9` 这类依赖分数中间结果的解不会因浮点误差被漏掉或误判。
+关键词是「**全部**」：不是「找到一个就返回」，而是**完全枚举**——不剪枝、不启发式，只要不漏解。
+运算全程使用自己实现的**精确有理数**（`BigInteger` 支撑），因此 `(1 + 1/9) * 9` 这类依赖分数中间
+结果的解不会因浮点误差被漏掉或误判。
 
-界面侧对输入有更严格的限制（见 §3.3）：**候选数最多 5 个**、`|候选数| < 256`（严格小于，与求解器的 `require` 一致）、`|target| ≤ 16384`。求解器本身的能力上限仍是 `n = 8`。
+界面侧对输入有更严格的限制（见 §3.3）：**候选数最多 5 个**、`|候选数| < 256`（严格小于，与求解器
+的 `require` 一致）、`|target| ≤ 16384`。
 
 ### 1.2 目录结构
 
 ```
 Wakusei/
-├── README.md                     # 本文件
-├── TUTORIAL.md                   # 交互说明书（英文）
-├── diff_*.MD                     # 逐轮变更记录（真实 git diff）
-├── settings.gradle.kts           # 根项目 "24 Solver"，include(":app")
-├── build.gradle.kts / gradle/    # 版本目录 (libs.versions.toml)、wrapper
+├── README.md                       # 本文件
+├── TUTORIAL.md                     # 交互说明书（英文）
+├── .github/workflows/android.yml   # CI：单测 + lint + 打包（见 §4.4）
+├── tools/reference-solver.js       # 独立的参考实现，产出测试里的期望解数（见附录 B）
+├── settings.gradle.kts             # 根项目 "24 Solver"，include(":app")
+├── build.gradle.kts / gradle/      # 版本目录 (libs.versions.toml)、wrapper
 └── app/
-    ├── build.gradle.kts          # 模块配置（viewBinding、依赖、单测 JVM、SDK 版本）
+    ├── build.gradle.kts            # 模块配置（viewBinding、依赖、单测 JVM、SDK 版本）
     └── src/
         ├── main/
-        │   ├── AndroidManifest.xml    # 含 AdMob APPLICATION_ID（见 §3.6）
+        │   ├── AndroidManifest.xml        # 含 AdMob APPLICATION_ID（见 §3.7）
         │   ├── java/com/a24solver/wakusei/
-        │   │   ├── SyntaxTree.kt      # ★ 求解核心（枚举 / 求值 / 打印）
-        │   │   ├── Rational.kt        # ★ 精确有理数
-        │   │   ├── FirstFragment.kt   # ★ 输入界面：键盘、校验、后台求解
-        │   │   ├── SecondFragment.kt  # ★ 结果界面：答案列表 + BACK
-        │   │   ├── SolveResultViewModel.kt  # 两个界面之间共享的解集
-        │   │   ├── Ads.kt             # 广告 SDK 的异常防护层
-        │   │   └── MainActivity.kt    # 壳：NavHost + 40dp 顶栏（FAB 已注释）
-        │   ├── keepRules/rules.keep   # R8 保留规则（模板，全注释）
-        │   └── res/
-        │       ├── layout/fragment_first.xml   # 键盘 + 标签 + SOLVE
-        │       ├── layout/fragment_second.xml  # 标题 + 答案 + BACK
-        │       ├── values/strings.xml          # 全部文案
-        │       ├── values/styles.xml           # 键盘按键样式（20sp 字号等）
-        │       ├── values/colors.xml           # rose / rose_checked / rose_disabled
-        │       ├── color/button_rose_tint.xml  # 特殊键的玫红状态选择器
-        │       ├── drawable/ic_launcher_background.xml  # 图标底层：玫红铺底
-        │       ├── drawable/ic_launcher_foreground.xml  # 图标标记：七段式 “24” + SOLVER
-        │       ├── mipmap-anydpi*、mipmap-*dpi/         # 自适应图标（API 26+）+ 早期密度位图
-        │       └── navigation / menu / values-* / xml
+        │   │   ├── solver/                # ★ 求解核心：纯 Kotlin，不引用任何 android.*
+        │   │   │   ├── Rational.kt        # ★ 精确有理数（BigInteger，构造即最简）
+        │   │   │   ├── Expression.kt      # ★ 表达式树：求值 / 打印 / 规范形 key
+        │   │   │   └── Solver.kt          # ★ 子集 DP、内存预算、两种解集
+        │   │   ├── FirstFragment.kt       # ★ 输入界面：键盘、校验、后台求解、状态恢复
+        │   │   ├── SecondFragment.kt      # ★ 结果界面：答案列表 + 全部/本质不同切换
+        │   │   ├── SolveResultViewModel.kt# 两个界面之间共享的解集与显示选择
+        │   │   ├── Ads.kt                 # 广告 SDK 的异常防护层
+        │   │   └── MainActivity.kt        # 壳：NavHost + 40dp 顶栏
+        │   ├── keepRules/rules.keep       # R8 保留规则（模板，当前 release 未开启 R8）
+        │   └── res/                       # values（英文）/ values-zh（中文）/ layout / ...
         ├── test/java/com/a24solver/wakusei/
-        │   ├── SyntaxTreeTest.kt      # 求解器：命中 + 枚举不重不漏
-        │   ├── RationalTest.kt        # 有理数运算
-        │   ├── FirstFragmentTest.kt   # ★ 输入/结果界面的 Robolectric 测试（25 例）
-        │   ├── AdsTest.kt             # 广告防护（3 例）
-        │   ├── IconTest.kt            # 图标资源与 66dp 安全区几何（3 例）
-        │   └── ExampleUnitTest.kt
-        └── androidTest/java/…         # 仪器测试（模板）
+        │   ├── solver/
+        │   │   ├── RationalTest.kt        # 有理数：规范化、四则、比较、不溢出
+        │   │   ├── ExpressionTest.kt      # 打印规则、括号最少化、规范形、随机往返
+        │   │   ├── SolverTest.kt          # ★ 解数、穷尽性、与暴力枚举差分、预算与校验
+        │   │   ├── SolverPurityTest.kt    # 断言 solver 包不引用 android/androidx
+        │   │   ├── BruteForceOracle.kt    # ★ 测试用的独立暴力枚举（差分基准）
+        │   │   └── ExpressionParser.kt    # ★ 测试用的独立解析器（验证打印可往返）
+        │   ├── FirstFragmentTest.kt       # Robolectric：键盘、拉杆、手势、校验、结果往返
+        │   ├── SolveResultViewModelTest.kt# 结果界面的显示规则与选择保持
+        │   ├── AdsTest.kt                 # 广告防护
+        │   └── IconTest.kt                # 图标资源与 66dp 安全区几何
+        └── androidTest/java/…/LaunchSmokeTest.kt   # 真机冒烟：应用能启动（见 §4.3）
 ```
 
-求解逻辑（`SyntaxTree.kt` / `Rational.kt`）不引用任何 `android.*` 类，与界面完全解耦，因此可直接用 JVM 单测驱动；界面逻辑用 Robolectric 在 JVM 上驱动（见 §4）。
+求解逻辑（`solver/`）不引用任何 `android.*` 类，与界面完全解耦，因此可直接用 JVM 单测驱动；
+这一点由 `SolverPurityTest` 扫描编译产物的常量池来**强制**保证，而不是只写在文档里。
 
 ### 1.3 已实现 / 未实现
 
 | 部分 | 状态 |
 | --- | --- |
-| 有理数运算、三种枚举器、命中判定、表达式字符串化 | ✅ 实现并有单测 |
+| 精确有理数（`BigInteger`，构造即最简，永不静默溢出） | ✅ 实现并有单测 |
+| 子集 DP 穷尽枚举（不剪枝、不漏解），精确命中判定 | ✅ 实现并有单测 |
+| 「全部表达式」与「本质不同解」两种输出 | ✅ 实现并有单测 |
+| 最小括号打印（打印结果可被独立解析器还原成同一棵树） | ✅ 实现并有单测 |
+| 与独立暴力枚举的差分测试（n ≤ 5，随机输入） | ✅ 实现 |
 | 输入界面：数字键盘、`[+/-]`、`DEL`、`NEXT`、`CLEAR`、`TARGET` 拉杆 | ✅ 实现并有测试 |
 | 调用前校验（≤5 个候选数、`|x| < 256`、`|target| ≤ 16384`） | ✅ 实现并有测试 |
 | 后台求解（`Dispatchers.Default` + `lifecycleScope`），求解中禁用按钮 | ✅ 实现并有测试 |
-| 结果界面：答案列表 + `BACK` 返回 | ✅ 实现并有测试 |
-| 长按手势：`CLEAR` 全部复位、`DEL` 撤销最后一个候选数（带系统级轻振动） | ✅ 实现并有测试 |
-| 广告 SDK 的异常防护 + 启动崩溃的配置修复 | ✅ 实现并有测试（见 §3.6） |
-| 解集的规范化去重（等价式合并） | ❌ 目前只在字符串层面去重（§5.2） |
-| 性能优化（剪枝 / 记忆化 / 并行） | ❌ 纯暴力枚举（§5.3）。界面把候选数限制在 5 个，n ≤ 5 可用 |
-| 长按阈值可配置 | ❌ 目前固定为系统默认 500 ms（TODO P2） |
+| 结果界面：答案列表、全部/本质不同切换、`BACK` | ✅ 实现并有测试 |
+| 长按手势：`CLEAR` 全部复位、`DEL` 撤销最后一个候选数（系统级轻振动） | ✅ 实现并有测试 |
+| 旋转 / 配置变更后输入不丢失 | ✅ 实现并有测试 |
+| 中文界面（`values-zh`） | ✅ 实现（英文为默认） |
+| 广告 SDK 的异常防护 + 启动崩溃的配置修复 | ✅ 实现并有测试（见 §3.7） |
+| 真机 / 模拟器仪器测试 | ⚠️ 只有启动冒烟测试（见 §4.3），本机无设备可跑 |
+| n ≥ 6 的完全枚举 | ❌ 解空间本身过大，求解器会**快速报错**而不是卡死（见 §5.2） |
+| 答案列表换成 `RecyclerView` | ❌ 仍是单个可选中 `TextView`（见 §5.3） |
+| detekt / ktlint | ❌ 只跑 Android Lint |
 
 ---
 
@@ -95,62 +106,126 @@ Wakusei/
 
 ### 2.1 一句话概括
 
-`解集 = { 打印(树, 运算符分配, 排列) | 树 ∈ 全部满二叉树形状, 运算符 ∈ {+,-,*,/}^(n-1), 排列 ∈ S_n, 求值(…) == target }`
+```
+解集 = { e : e 是一棵以输入数字为叶子的二叉树，每个数恰好用一次，运算符 ∈ {+,-,*,/}，
+        求值(e) == target }
+```
 
-即：**「所有加括号方式」×「所有运算符组合」×「所有数字摆放顺序」**，三重笛卡尔积逐一求值。代码就是 `SyntaxTree.solveIt` 里的三个嵌套 `for`（`SyntaxTree.kt:54-63`）。
+求解器不再「树形 × 运算符 × 排列」三重循环，而是对**输入位置的下标集合**做子集动态规划：
 
-### 2.2 三个枚举器
+```
+values[mask] = { 表达式 : 该表达式恰好用掉 mask 中那些位置的数字 }
+```
 
-**(1) 表达式树形状 —— `generateTrees(size)`**（`SyntaxTree.kt:70-107`）
+`mask` 由「任意分成两个非空子集」的方式组合而成，于是每棵树只被构造一次，公共子结果被复用。
+搜索空间从 `Catalan(n-1) · 4^n · n!` 降到约 `3^n` 级别的「切分 × 取值」组合（见 §2.5）。
 
-任何「用 `n` 个数做一次四则运算链」的表达式都对应一棵**叶子数 = n 的满二叉树**。递归枚举所有形状，数量是 Catalan 数 `C(n-1)`：n=4 → 5 种，n=8 → 429 种。关键设计是**槽位编号**：生成时给叶子分配 `leafIdx ∈ 0..n-1`、给内部结点分配 `signIdx ∈ 0..n-2`，于是「树的形状」与「用哪些数字、填哪些运算符」解耦——形状只枚举一次即可复用。返回惰性 `Sequence<Node>`。`SyntaxTreeTest.testGenTrees` 校验这个不重不漏的性质。
+### 2.2 精确有理数 `Rational`（`solver/Rational.kt`）
 
-**(2) 运算符组合 —— `SignAssign(size)`**（`SyntaxTree.kt:133-157`）
+不可变、**构造即最简**：分母恒正、符号放在分子、`0` 规范成 `0/1`，于是 `equals` 就是数值相等，
+`HashMap<Rational, _>` 可以直接作为 DP 的记忆表。提供四则运算（除零返回 `null` 而不是抛异常，
+因为「这条分支不成立」是搜索的正常情况）、`Comparable`、`toString`（分母为 1 只打印整数）。
 
-运算符编码为 `0 → +`、`1 → -`、`2 → *`、`3 → /`（取模 4 兜底）。`SignAssign` 是一个四进制计数器：`hasNext()` = 还有不是 3 的位；`next()` = 从低位进位加一。
+用 `BigInteger` 而不是 `Long` 是刻意的：本项目允许 `n = 8` 且 `|x| < 256`，而
+`255^8 = 17878103347812890625`，作为有符号 64 位整数会回绕成 `-568640725896660991`。回绕不是
+「精度差一点」，而是会**凭空造出解或吃掉解**——对承诺「全部解」的枚举器来说不可接受。
+（7 个数以内 `Long` 其实够用：`255^7` 只要 56 位；修正只影响输入范围顶端，代价也很小。）
+`RationalTest.arithmeticDoesNotWrapAroundWhereLongWould` 把这条差异固定成了测试。
 
-**(3) 数字摆放 —— `permutations(size)`**（`SyntaxTree.kt:109-130`）
+### 2.3 表达式 `Expression`（`solver/Expression.kt`）
 
-标准回溯（`vis` + `bucket`），惰性产出 `n!` 个下标排列。
+```kotlin
+sealed interface Expression {
+    fun evaluate(): Rational      // 精确求值
+    fun render(): String          // 最小括号打印
+    fun canonicalKey(): String    // + / * 的交换律 + 结合律归一后的 key
+    data class Literal(val number: Int) : Expression
+    data class Binary(val left: Expression, val right: Expression, val operator: Operator) : Expression
+}
+```
 
-### 2.3 求值与字符串化
+**打印规则（括号最少化且无歧义）**：子节点需要括号，当且仅当
 
-- `resolve(...)`（`SyntaxTree.kt:20-35`）：递归求值，叶子取 `numbers[permutation[leafIdx]]`，内部结点按 `signAssign[signIdx] % 4` 运算。**除以 0 返回 `null`**，`null` 沿树上传使整条分支作废——除零保护靠类型系统而非异常。
-- `myPrint(...)`（`SyntaxTree.kt:37-51`）：与求值同构的递归，输出**全括号中缀**形式，如 `(((1 + (1 / 9)) * 9) * 6)`。
-- 命中判定 `Rational(target.toLong()) == result`：`Rational` 是 `data class`，相等性即「约分后分子分母分别相等」，精确无误差。
-- 解集是 `MutableSet<String>`，**去重单位是打印出来的字符串**。
+- 子节点优先级 < 父节点优先级（`(1 + 2) * 3`），或
+- 子节点是**右**操作数且优先级相等（`1 - (2 - 3)`、`6 / (2 * 3)`）。
 
-### 2.4 精确有理数 `Rational`
+左操作数同等优先级不加括号（`1 + 2 + 3`、`6 / 2 * 3`），因此打印结果用标准的左结合优先级规则
+就能唯一地解析回原来那棵树。负数叶子一律写成 `(-7)`，所以 `2 - (-7)`、`3 * (-2)` 不会产生
+`2 - -7` 这种要靠猜的写法。
 
-`data class Rational(n: Long, d: Long = 1L)`：`init` 中拒绝分母 0、把 0 规范成 `0/1`、把符号搬到分子、用 `gcd` 约分——**构造即最简**，这是相等比较能用 data class 默认实现的前提。提供四则运算（除零返回 `null`）、运算符重载、`compareTo`、`toString`（分母为 1 只打印整数）。不用 `Double` 是正确的：24 点存在大量必须用分数表达的解。
+**规范形 `canonicalKey`**：对 `+` 和 `*`，把同级链条摊平后按 key 排序，于是
+`(12 + 13)` 与 `(13 + 12)`、`((1 + 2) + 3)` 与 `(1 + (2 + 3))` 得到同一个 key。
+减法和除法**不做**代数改写（不把 `a - b` 折成 `a + (-b)`），因此「本质不同」只会合并用户也会
+认为相同的写法，不会把看起来不同的解法吞掉。
 
-### 2.5 搜索空间规模（实测）
+### 2.4 枚举器 `Solver`（`solver/Solver.kt`）
 
-`总循环次数 = Catalan(n-1) × 4^n × n!`：
+```kotlin
+val outcome = Solver.solve(target = 24, numbers = listOf(1, 2, 3, 4))
+outcome.allSolutions        // 242 条：每一个不同的表达式字符串
+outcome.essentialSolutions  //  28 条：每个交换/结合等价类一条代表
+```
 
-| n | 树形状 Catalan(n-1) | 运算符 4^n | 排列 n! | 实际循环次数 |
-| --- | --- | --- | --- | --- |
-| 2 | 1 | 16 | 2 | 32 |
-| 3 | 2 | 64 | 6 | 768 |
-| 4 | 5 | 256 | 24 | 30,720 |
-| 5 | 14 | 1,024 | 120 | 1,720,320 |
-| 6 | 42 | 4,096 | 720 | 123,863,040 |
-| 7 | 132 | 16,384 | 5,040 | 10,899,947,520 |
-| 8 | 429 | 65,536 | 40,320 | **1,133,594,542,080** |
+- DP 按 mask 从小到大推进；每个 mask 遍历其**无序**二分（`leftMask < rightMask`），
+  在这一次里把 4 种运算符的**两个操作数顺序都生成**（`a - b` 与 `b - a` 都是解，
+  `a + b` 与 `b + a` 是两个不同表达式），所以每棵树仍然恰好生成一次。
+- 每个 `(mask, 取值)` 桶按**打印字符串**去重：两棵打印相同的子树在更大的表达式里可互换，
+  丢掉重复的不会丢解（差分测试验证了这一点）。
+- 除零在这里被丢弃，这是整个求解器里唯一会出现「运算未定义」的地方。
+- 排序：两个列表都按（长度，字典序）升序，即**最简单的解排在最前面**。
+- 「本质不同」的代表取所在类里最短、其次字典序最小的那一条。
 
-（`SignAssign(size)` 产出 `4^n` 个向量，但树只有 `n-1` 个内部结点槽位，最后一个分量永远不被读取 → 白跑 4 倍；本应是 `4^(n-1)`。）
+### 2.5 搜索空间与实测性能
+
+| n | 旧实现循环次数 `Catalan(n-1)·4^n·n!` | 新实现：DP 的「切分 × 取值」组合 |
+| --- | --- | --- |
+| 2 | 32 | 1 |
+| 3 | 768 | 6 |
+| 4 | 30,720 | 25 |
+| 5 | 1,720,320 | 90 |
+| 6 | 123,863,040 | 301 |
+| 7 | 10,899,947,520 | 966 |
+| 8 | **1,133,594,542,080** | 3,025 |
+
+（上表右列是**切分组合数**；真实代价还要乘以每个 `(子集, 取值)` 桶里的表达式条数，
+所以它不是「快了 10^9 倍」，而是「不再重复计算公共子表达式」。）
+
+实测（桌面 JVM，`solver` 包，含全部中间结果）：
+
+| 输入 | 耗时 | 中间表达式条数 | 输出 |
+| --- | --- | --- | --- |
+| n=4 `1,2,3,4 → 24` | 约 50 ms | 8,476 | 242 全部 / 28 本质 |
+| n=5 `1,2,3,4,5 → 24` | 约 250 ms | 468,309 | 2,258 全部 / 273 本质 |
+| n=5 `1,1,9,9,6 → 60` | 约 100 ms | 124,375 | 26 全部 / 2 本质 |
+| n=5 五个互不相同的数（最坏） | 约 260 ms | 470,485（上界） | — |
+| n=6 及以上 | ≲ 0.5 s 后抛 `SolverLimitException` | 超过预算 | — |
+
+DP 保存的是**表达式**而不只是取值，所以内存比解数增长得快得多：n=6 只看顶层 mask 就有
+`Catalan(5)·4^5·6! = 30,965,760` 条表达式。把预算放宽到 4,000,000 条时，JVM 会在 13–34 秒后
+以 `OutOfMemoryError` 倒下。因此 `MAX_STORED_EXPRESSIONS = 500_000`：
+
+- 界面允许的最坏输入（5 个互不相同的数字）需要 `Σ C(5,k)·Catalan(k-1)·4^(k-1)·k! = 470,485` 条，
+  预算刚好覆盖（`SolverTest.theBudgetIsAboveEveryInputTheInputScreenAccepts` 用公式断言了这一点）；
+- 6 个及以上的数字会在半秒内抛出 `SolverLimitException`，错误信息说明是「太大，无法穷尽枚举」，
+  而不是挂起或崩溃。
 
 ### 2.6 解集的冗余度（实测）
 
-| target | 数字 | 实际循环次数 | 解集大小（字符串） |
+| target | 数字 | 全部表达式 | 本质不同 |
 | --- | --- | --- | --- |
-| 24 | 1, 2, 3, 4 | 30,720 | **242** |
-| 24 | 3, 3, 8, 8 | 30,720 | 1 |
-| 24 | 5, 5, 5, 1 | 30,720 | 2 |
-| 24 | 23, 23, 23, 23 | 30,720 | 2 |
-| 60 | 1, 1, 9, 9, 6 | 1,720,320 | 26 |
+| 24 | 1, 2, 3, 4 | **242** | **28** |
+| 24 | 6, 6, 6, 6 | 7 | 3 |
+| 24 | 5, 5, 5, 1 | 2 | 1 |
+| 24 | 23, 23, 23, 23 | 2 | 1 |
+| 24 | 3, 3, 8, 8 | 1 | 1 |
+| 60 | 1, 1, 9, 9, 6 | 26 | 2 |
+| 0 | 1, 1, 1, 1 | 66 | 45 |
+| 10 | -5, 2, 3 | 8 | 5 |
+| 24 | 1, 1, 1, 1 / 7, 7, 7, 7 | 0 | 0 |
 
-`1,2,3,4 → 24` 的 242 条里，若按「加法/乘法的交换律 + 结合律」归一，只剩 **28 个本质不同的解**——约 88% 是等价变形（§5.2）。
+`1,2,3,4 → 24` 的 242 条里，按 `+`/`*` 的交换律与结合律归一后只剩 **28** 个本质不同的解——
+约 88% 是同一种解法的书写变形。上表每一行的两个数字都由**独立实现**验证过（§附录 B），
+并且被写进了 `SolverTest.reportsTheIndependentlyVerifiedSolutionCounts`。
 
 ---
 
@@ -173,20 +248,34 @@ INPUT: 12 / TARGET INPUT: 12  ← text_current_input（当前缓冲 + 当前模�
 [         SOLVE            ]
 ```
 
-- 每个键有 `4dp` 的左右外边距（`layout_marginStart/End`）形成间隙；按键文字 `20sp`（`values/styles.xml` 的 `Widget.App.KeypadButton`）。
-- 键盘整体包在 `@id/keypad` 容器里，权重 4；其下是 `@id/keypad_spacer`（权重 1）。因此键盘区高度恰为原先行区空间的 **80%**，每个键相应变矮；空出的 1/5 成为 `SOLVE` 上方的留白。
+- 每个键有 `4dp` 的左右外边距（`layout_marginStart/End`）形成间隙；按键文字 `20sp`
+  （`values/styles.xml` 的 `Widget.App.KeypadButton`）。数字键的文案来自 `@string/digit_*`
+  （`translatable="false"`：键盘输入的是解析器接受的 ASCII 数字，不应跟随地区数字形状）。
+- 键盘整体包在 `@id/keypad` 容器里，权重 4；其下是 `@id/keypad_spacer`（权重 1）。因此键盘区
+  高度恰为原先行区空间的 **80%**。该容器内是 5 行等权重的 `LinearLayout`——即「权重套权重」，
+  这是表达「5 行等分固定的 80% 高度」最直接的方式，故在布局里对 `NestedWeights` 做了**带说明的
+  局部抑制**（层次固定为 5 行、只多一次测量，代价可忽略）。
 - `SOLVE` 固定 `56dp`（默认 wrap_content 约 48dp，即约 +20%）。
-- 特殊键（`[+/-] [NEXT] [CLEAR] [TARGET] [DEL]`）用 `Widget.App.KeypadButton.Special`：`backgroundTint` 指向 `res/color/button_rose_tint.xml`（默认玫红 `#D81B60` / 拉杆激活 `#AD1457` / 禁用淡玫红），白字。
-  - ⚠️ 必须用 `app:backgroundTint` 或样式里的 `backgroundTint`，**`android:backgroundTint` 会被 MaterialButton 忽略**（主题色会赢）。
-- 顶栏：`AppBarLayout` 固定 `40dp`（原 `?attr/actionBarSize` 56dp），`MaterialToolbar` 加 `minHeight=0dp`；承载标题与返回箭头，仍在用。
-- FAB（浮动按钮）按需求**注释掉**（`activity_main.xml` + `MainActivity.kt` 的监听与 import），需要时取消注释即可。
+- 特殊键（`[+/-] [NEXT] [CLEAR] [TARGET] [DEL]`）用 `Widget.App.KeypadButton.Special`：
+  `backgroundTint` 指向 `res/color/button_rose_tint.xml`（默认玫红 `#D81B60` / 拉杆激活 `#AD1457` /
+  禁用淡玫红），白字。
+  - ⚠️ 必须用 `app:backgroundTint` 或样式里的 `backgroundTint`，**`android:backgroundTint` 会被
+    MaterialButton 忽略**（主题色会赢）。
+- 顶栏：`AppBarLayout` 固定 `40dp`（原 `?attr/actionBarSize` 56dp），`MaterialToolbar` 加
+  `minHeight=0dp`；承载标题与返回箭头。
 
 ### 3.2 输入模型：两个缓冲 + TARGET 拉杆
 
-- 两个独立缓冲：`numberInput`（候选数）与 `targetInput`（目标值），数字键编辑的是「当前模式」的那个，互不干扰。
-- `[TARGET]` 是**拉杆**（`MaterialButton` + `android:checkable`，点击后自身保持选中）：激活后键盘改写目标值，**输入框不预填**（保持 `_`，标签仍显示生效中的目标）；退出时若输入非空且非 `-` 就**写回**目标值，超范围则拒绝并保持激活（输入不丢）。再按一次即取消。
+- 两个独立缓冲：`numberInput`（候选数）与 `targetInput`（目标值），数字键编辑的是「当前模式」的
+  那个，互不干扰。
+- `[TARGET]` 是**拉杆**（`MaterialButton` + `android:checkable`，点击后自身保持选中）：激活后键盘
+  改写目标值，**输入框不预填**（保持 `_`，标签仍显示生效中的目标）；退出时若输入非空且非 `-` 就
+  **写回**目标值，超范围则拒绝并保持激活（输入不丢）。再按一次即取消。
 - `NEXT` 提交当前缓冲（候选数或目标值），提交后清空缓冲。
 - `DEL` 点按 = 退格；`[+/-]` 对当前缓冲取反（空缓冲时按它会开始一个负数）。
+- **配置变更不丢输入**：`onSaveInstanceState` 保存候选数、目标值、两个缓冲与拉杆状态，
+  `onViewCreated` 恢复（恢复拉杆时用 `restoringTargetLatch` 挡住监听器，避免它清掉刚恢复的缓冲）。
+  对应的测试会真的旋转一次：`controller.recreate()`。
 
 ### 3.3 调用前校验
 
@@ -199,7 +288,9 @@ INPUT: 12 / TARGET INPUT: 12  ← text_current_input（当前缓冲 + 当前模�
 | 目标值 `|target| ≤ 16384` | `MAX_ABS_TARGET = 16384` | Toast「The target must be within ±16384」 |
 | 至少一个候选数 | — | Toast「Add at least one number …」 |
 
-按 `SOLVE` 时若缓冲里还有未提交的数字，会先自动提交——保证「校验的就是屏幕上看到的」。该严格上界与 `SyntaxTree.solveIt` 的 `require { abs(it) < 256 }` 现已一致，不会再有「界面通过、求解器拒绝」的边界矛盾。
+按 `SOLVE` 时若缓冲里还有未提交的数字，会先自动提交——保证「校验的就是屏幕上看到的」。
+第 1、3 条用 `<plurals>` 提供单复数正确的英文文案（中文用 `values-zh` 的 `other` 形式）。
+该严格上界与 `Solver` 的 `require { |x| < 256 }` 一致，不会出现「界面通过、求解器拒绝」的矛盾。
 
 ### 3.4 长按手势与按键振动
 
@@ -209,102 +300,175 @@ INPUT: 12 / TARGET INPUT: 12  ← text_current_input（当前缓冲 + 当前模�
 | `CLEAR` 长按 | 候选数与目标全部复位，Toast「All Numbers Set to Default」+ 轻振动 |
 | `DEL` 长按 | 删除最后一个已提交的候选数；**仅在真的删除了**的时候轻振动 |
 
-- 阈值 `x = 500 ms`：使用平台自身的长按超时（`ViewConfiguration.getLongPressTimeout()`，标准 Android 上就是 500 ms），所以 `FirstFragment.LONG_PRESS_MS` 是**说明性常量**而非强制值。让 `x` 可配置是 P2 TODO。
-- 振动采用 `View.performHapticFeedback(HapticFeedbackConstants.KEYBOARD_TAP)`：**弱**、无需任何权限（没有 `VIBRATE`、不直接使用 Vibrator），并且由系统设置托管——用户关闭「触感反馈 / 振动与触感」后即静默。即「默认受 Android 管理」的那条路径。
+- 阈值 `x = 500 ms`：使用平台自身的长按超时（`ViewConfiguration.getLongPressTimeout()`，标准
+  Android 上就是 500 ms），所以 `FirstFragment.LONG_PRESS_MS` 是**说明性常量**而非强制值。
+  让 `x` 可配置是 P2 TODO。
+- 振动采用 `View.performHapticFeedback(HapticFeedbackConstants.KEYBOARD_TAP)`：**弱**、无需任何
+  权限（没有 `VIBRATE`、不直接使用 Vibrator），并且由系统设置托管——用户关闭「触感反馈 / 振动与
+  触感」后即静默。键盘上的 `android:hapticFeedbackEnabled="false"` 用来关掉平台自己在长按时发出的
+  那一记通用震动，因此「有轻振动」恰好等价于「动作真的发生了」。
 
 ### 3.5 求解与结果界面
 
 ```kotlin
 solveJob = viewLifecycleOwner.lifecycleScope.launch {
-    val outcome = withContext(Dispatchers.Default) { runCatching { SyntaxTree.solveIt(target, candidates) } }
+    val outcome = withContext(Dispatchers.Default) {
+        runCatching { Solver.solve(targetSnapshot, candidates) }
+    }
     …
 }
 ```
 
-求解期间标签显示 `SOLVING…`、`SOLVE` 禁用；完成后把结果交给 activity 级 `SolveResultViewModel`（不用 navigation arguments：答案可能有上千条，arguments 会写进 saved state，必须保持小体积）并 `navigate(action_FirstFragment_to_SecondFragment)`。
+求解期间标签显示 `SOLVING…`、`SOLVE` 禁用；完成后把 `SolveOutcome` 交给 activity 级
+`SolveResultViewModel`（不用 navigation arguments：答案可能有上千条，arguments 会写进 saved
+state，必须保持小体积）并 `navigate(action_FirstFragment_to_SecondFragment)`。
 
-结果界面（`SecondFragment` + `fragment_second.xml`）：上方是标题（`N answer(s) for target T from …`）与可滚动的答案列表（等宽、可选中复制，一行一条，带序号），下方是通栏 `BACK` → `navigateUp()` 回到键盘。无解时显示「No expression built from these numbers reaches the target.」。求解器抛异常（`IllegalArgumentException`）时用 Toast 报告并恢复标签，不崩溃。
+结果界面（`SecondFragment` + `fragment_second.xml`）：
 
-### 3.6 广告依赖的异常防护
+- 顶部标题按 `<plurals>` 给出「N answers / N essentially different answers …」；
+- 其下是 **`All (242)` / `Essential (28)` 二选一开关**（`MaterialButtonToggleGroup`），两个列表
+  在求解时一次算好，切换只是换一个列表来渲染，瞬时完成；当两组相同（只有 1 条解或无解）时开关
+  **隐藏**——不提供无法改变任何东西的控件；
+- 答案列表是可滚动的等宽可选中 `TextView`，一行一条、带序号，按「简单优先」排序；
+- 底部通栏 `BACK` → `navigateUp()` 回到键盘。
+- 无解时显示「No expression built from these numbers reaches the target.」；求解器抛异常
+  （`IllegalArgumentException` / `SolverLimitException`）时用 Toast 报告并恢复标签，不崩溃。
 
-`play-services-ads` 会把 `MobileAdsInitProvider` 合并进 manifest，它在 `ActivityThread.handleBindApplication` 阶段（**早于 `Application.onCreate`**）运行，缺少 `com.google.android.gms.ads.APPLICATION_ID` 时抛 `IllegalStateException`，表现为启动崩溃 `RuntimeException: Unable to get provider com.google.android.gms.ads.MobileAdsInitProvider`。**这种崩溃无法用应用代码 try/catch**，所以：
+按 `BACK` 再返回结果界面时，选择仍然保留（选择状态存在 ViewModel 里，rotate 亦然）。
 
-- `AndroidManifest.xml` 声明该 meta-data（值取自 `@string/admob_app_id`，当前是 Google 官方样例 ID，**发布前必须替换**）；
-- `Ads.kt` 提供异常防护层（`loadSafely` 兜住 `Throwable`、`initialize` 幂等），`MainActivity.onCreate` 调用一次；
+### 3.6 窗口 insets
+
+`enableEdgeToEdge()` + 布局里 `CoordinatorLayout` 与 `AppBarLayout` 的
+`android:fitsSystemWindows="true"` 是**声明式**的 insets 处理。这里刻意**没有**再叠加
+`ViewCompat.setOnApplyWindowInsetsListener`：两者同时存在时，根布局会先按状态栏内边距 padding
+一次，子 `AppBarLayout` 又消费一次，顶栏被下推整整两个状态栏高度。（此前代码里两者都有。）
+
+### 3.7 广告依赖的异常防护
+
+`play-services-ads` 会把 `MobileAdsInitProvider` 合并进 manifest，它在
+`ActivityThread.handleBindApplication` 阶段（**早于 `Application.onCreate`**）运行，缺少
+`com.google.android.gms.ads.APPLICATION_ID` 时抛 `IllegalStateException`，表现为启动崩溃
+`RuntimeException: Unable to get provider com.google.android.gms.ads.MobileAdsInitProvider`。
+**这种崩溃无法用应用代码 try/catch**，所以：
+
+- `AndroidManifest.xml` 声明该 meta-data（值取自 `@string/admob_app_id`，当前是 Google 官方样例
+  ID，**发布前必须替换**）；`LaunchSmokeTest` 是在真机上验证这条的唯一手段；
+- `Ads.kt` 提供异常防护层（`loadSafely` 兜住 `Throwable`、`initialize` 幂等），
+  `MainActivity.onCreate` 用 **applicationContext** 调用一次（不持有 Activity 引用）；
 - `AdsTest` 断言该 meta-data 存在且形态正确（`ca-app-pub-…~…`）。
 
 ---
 
 ## 4. 测试与构建
 
+### 4.1 测试清单
+
 | 测试类 | 覆盖内容 | 数量 |
 | --- | --- | --- |
-| `RationalTest` | 构造/约分/符号、四则、除零、比较 | 7 |
-| `SyntaxTreeTest` | `solveIt` 命中（含分数解）、三个枚举器不重不漏 | 8 |
-| `FirstFragmentTest` | 键盘布局/尺寸/配色、按键接线、拉杆与写回、CLEAR 点按与长按、DEL 长按、校验、后台求解与结果往返（Robolectric） | 25 |
+| `RationalTest` | 构造/约分/符号、四则、除零、精确比较、`Long` 会回绕的算例 | 8 |
+| `ExpressionTest` | 括号最少化规则、负数叶子、规范形、随机树打印往返、求值一致 | 6 |
+| `SolverTest` | 解数（独立验证）、每个解真的等于目标且每个数用一次、去重与排序、本质解每类一条、与暴力枚举差分、预算与输入校验 | 15 |
+| `SolverPurityTest` | `solver` 包编译产物不引用 `android`/`androidx` | 1 |
+| `FirstFragmentTest` | 键盘布局/尺寸/配色、按键接线、拉杆与写回、CLEAR 点按与长按、DEL 长按、校验、后台求解与结果往返、全部/本质切换及其旋转保持、旋转不丢输入（Robolectric） | 29 |
+| `SolveResultViewModelTest` | 显示哪一份解集、两组相同时回落到「全部」、选择随 ViewModel 保留 | 4 |
 | `AdsTest` | app ID 声明、异常防护、初始化不抛 | 3 |
 | `IconTest` | 图标资源可解析（自适应图标 + 两层 drawable）、标记落在 66dp 安全圆内、两道标记不重叠 | 3 |
-| `ExampleUnitTest` | 模板用例 | 1 |
+| `LaunchSmokeTest`（androidTest） | 应用能在真机上启动并显示输入界面 | 1 |
+
+单元测试共 **69** 例。
+
+### 4.2 构建与测试命令
 
 ```bash
 cd F:/code/Wakusei
-./gradlew.bat :app:testDebugUnitTest   # 全部单元测试
+./gradlew.bat :app:testDebugUnitTest   # 全部单元测试（69 例，约 25 s）
+./gradlew.bat :app:lintDebug           # Android Lint（当前应无 error）
 ./gradlew.bat :app:assembleDebug       # 打 debug APK
+./gradlew.bat :app:assembleDebugAndroidTest   # 编译仪器测试
+./gradlew.bat :app:connectedDebugAndroidTest  # 需要真机/模拟器
 ./gradlew.bat :app:compileDebugKotlin  # 只编译，最快的自检
+node tools/reference-solver.js         # 重新打印期望解数（独立实现，见附录 B）
 ```
 
-两个已处理的工具链坑（都在 `app/build.gradle.kts` 里）：
+### 4.3 关于仪器测试
 
-- Robolectric 需要 `testOptions.unitTests.isIncludeAndroidResources = true` 才能看到合并后的资源与 manifest。
-- Gradle 守护进程跑在 **JDK 25** 上，Robolectric 4.14.1 内置的 ASM 读不了 Java 25 平台类（`Unsupported class file major version 69`），因此单测任务被固定到本机 **JDK 21**；应用与测试字节码仍是 Java 11。
-- 每个 Robolectric 测试类都要写 `@Config(sdk = [34])`（Robolectric 4.14.1 不认识本项目的 `targetSdk 37`，缺了它整类会在 `DefaultSdkPicker` 直接初始化失败）。
-- Robolectric 无法真正栅格化 `VectorDrawable`（画进 `Canvas` 后再读 `Bitmap` 像素全是 0），所以图标外观用浏览器渲染同一份 pathData 校验，测试里只做资源与几何断言。
+`LaunchSmokeTest` 只做一件事：启动 `MainActivity` 并断言输入界面可见。它存在的理由很具体——
+§3.7 里那个启动崩溃只发生在真实进程启动路径上，Robolectric 看不到它。它由
+`:app:assembleDebugAndroidTest` 保证可编译，但**需要连接设备才能执行**；本仓库的验证环境没有
+设备，所以它在本机没有被跑过（这一点没有隐瞒在别处）。
 
-`SyntaxTreeTest.kt:54-61` 里 `size = 6` 的用例仍被注释掉（约 1.2 亿次循环）。
+### 4.4 CI
+
+`.github/workflows/android.yml`：push / PR 时在 `ubuntu-latest` 上装 JDK 25 与 Android SDK，
+跑 `:app:testDebugUnitTest`、`:app:lintDebug`、`:app:assembleDebug`、
+`:app:assembleDebugAndroidTest`，并上传测试与 lint 报告。选 JDK 25 是为了与
+`gradle/gradle-daemon-jvm.properties` 里的守护进程工具链一致，避免每次构建都让 foojay 解析器
+去下载一个 JDK。**该工作流尚未在 GitHub 上实际运行过**（本地没有 CI 环境），第一次推送时请留意
+日志。
+
+### 4.5 已处理的工具链坑
+
+- Robolectric 需要 `testOptions.unitTests.isIncludeAndroidResources = true` 才能看到合并后的资源
+  与 manifest。
+- 每个 Robolectric 测试类都要写 `@Config(sdk = [34])`：Robolectric 4.17 仍不认识本项目的
+  `targetSdk 37`，缺了它整类会在 `DefaultSdkPicker` 阶段直接失败（试过去掉，就是失败的样子）。
+- Robolectric 4.17 已经能在 Gradle 守护进程的 **JDK 25** 上跑，所以此前「单测固定到本机
+  JDK 21」的权宜已经删掉（`app/build.gradle.kts` 里留了恢复它的注释）。应用与测试字节码仍是
+  Java 11。
+- Robolectric 无法真正栅格化 `VectorDrawable`（画进 `Canvas` 后再读 `Bitmap` 像素全是 0），所以
+  图标外观用浏览器渲染同一份 pathData 校验，测试里只做资源与几何断言。
 
 ---
 
 ## 5. 局限
 
-### 5.1 界面侧的已知取舍
-
-- 长按阈值 `x` 固定为系统默认 500 ms，尚不可配置（P2 TODO）。
-- 答案列表是单个可选中 `TextView` + `ScrollView`（未引入 RecyclerView）；解数上千时建议换 `RecyclerView`。
-- FAB 已注释保留；若确定不用可连同 `@dimen/fab_margin` 一起删除。
-- 界面文案为英文，目前没有 `values-zh`（文案已全部资源化，加一个目录即可中文）。
-- 求解与结果界面之间用 ViewModel 传数据，进程被杀后结果页会显示空状态（符合预期，但不会自动重算）。
-
-### 5.2 「全部可能解」目前是「全部字符串」
-
-去重单位是打印字符串（`Set<String>`），因此下列语义相同的解会同时出现：交换律（`(12 + 13)` 与 `(13 + 12)`）、结合律（`((a + b) + c)` 与 `(a + (b + c))`），以及再叠加排列产生的整体等价。实测 `1,2,3,4 → 24`：242 条字符串 vs 28 个交换/结合等价类。也没有做 `a - b` / `a + (-b)`、`a / b` / `a * (1/b)` 这类代数变形合并。**「解」的规范形式尚未定义**。
-
-### 5.3 性能：搜索空间远超手机承受范围
-
-- n = 8 是 `1.13 × 10^12` 次循环（n = 7 已是 `1.1 × 10^10`），单线程 JVM 也要几天到几年。界面把候选数限制在 5 个，n ≤ 5 在后台线程上是秒级，但求解器自身没有更严的保护（只有 `require(size in 1..8)`）。
-- 没有剪枝、没有子表达式缓存、不排除「同一子集重复求解」。
-- 排列按**下标**而非**值**去重：输入有重复数字时（`1,1,9,9,6`、`5,5,5,1`）会重复计算完全相同的表达式，只靠最后字符串 `Set` 掩盖。
-- 运算符枚举多跑 4 倍（§2.5）。
-- 每个候选解都要重新走一遍树并拼接字符串；`Rational` 每次新建对象，分配量大。
-
-### 5.4 数值与类型问题
-
-- `Rational` 全程 `Long` 且不检查溢出：`n * other.d`、`this.d * other.d` 在嵌套运算中分母迅速变大，溢出后**静默给出错误结果**；`compareTo` 的叉乘同理。
-- `divide` 返回可空 `Rational?`，调用方到处 `!!`，漏判即 `NullPointerException`。
-- 相等性依赖「构造即约分」的不变式；若将来允许原地修改分子分母，`data class` 的 `equals` 会立刻失效。
-
-### 5.5 工程与代码质量
-
-- `SignAssign` 与 `permutations` 是**有状态、复用同一数组对象**的枚举器：当前调用方式没踩到，但任何「迭代两遍」「保存后处理」「并行化」的改动都会静默出错。
-- `SyntaxTree.solveIt` 是巨型函数（局部函数 + 三层循环），不便细分测试与改造。
-- 无 CI、无 lint/detekt；求解逻辑是纯 JVM 却放在 `app` 模块里，只能跑 `testDebugUnitTest`。
-- 广告相关：`admob_app_id` 仍是 Google 样例 ID（发布前必须替换）；依赖虽然没有广告位，但已声明且必须带着 meta-data，否则启动即崩。
-
-### 5.6 能力边界
+### 5.1 能力边界
 
 - 只支持二元运算符 `+ - * /`：没有一元负号、指数、取模、拼接（一些变体允许 `4!`、`√`、`12`）。
 - 每个数必须**恰好用一次且全部用上**：不支持「抽取子集求解」。
 - 求解器输入 `1..8` 且 `|x| < 256`；界面进一步限制为 ≤5 个、`|x| < 256`、`|target| ≤ 16384`。
-- 解只有全括号字符串形式：不产出步骤序列、不排序（仅按字符串排序）、不标注难度。
+- 解只有表达式字符串：不产出步骤序列、不标注难度。排序是「简单优先（长度、字典序）」，
+  不是「好玩优先」。
+
+### 5.2 n ≥ 6 无法完全枚举（有意为之）
+
+顶层 mask 的表达式条数是 `Catalan(n-1) · 4^(n-1) · n!`：n=6 已是 3.1×10^7，n=7 是 2.4×10^9，
+n=8 是 1.1×10^12。**这是输出本身的规模**，换算法也救不了——穷尽枚举在 n≥6 就不是「慢」的问题，
+而是「结果比内存大」。因此求解器选择：在半秒内抛出说明清楚的 `SolverLimitException`，而不是假装
+在工作。想支持更大的 n，需要换语义（例如只问「有没有解」或只输出本质解），那是另一条产品路线。
+
+### 5.3 界面侧的已知取舍
+
+- 长按阈值固定为系统默认 500 ms，尚不可配置（P2 TODO）。
+- 答案列表是单个可选中 `TextView` + `ScrollView`（未引入 RecyclerView）；解数上千时（5 个数字
+  可能有两千多条）会明显吃内存与滚动性能。
+- 界面文案英文为默认、中文在 `values-zh`；其它语言回落到英文。
+- 求解与结果界面之间用 ViewModel 传数据，进程被杀后结果页会显示空状态（符合预期，但不会自动重算）。
+
+### 5.4 「本质不同」的定义边界
+
+`essentialSolutions` 只做 `+`/`*` 的**交换律 + 结合律**归一。它**不**合并下列语义相同的解：
+
+- `a - b` 与 `a + (-b)`、`a / b` 与 `a * (1/b)`；`a - (b - c)` 与 `a - b + c`；
+- 跨运算符的代数恒等式（例如 `x * 2 / 2` 与 `x`）。
+
+这是刻意的保守选择：再往前一步就会开始合并用户认为不同的写法。规范形的精确定义见 §2.3。
+
+### 5.5 工程与代码质量
+
+- `Solver` 用的是保存表达式的 DP，内存随中间结果增长；预算把最坏情况限制在约 47 万条，
+  这是为「界面允许的输入」量身定制的数字（§2.5）。
+- 求解逻辑虽然是纯 JVM，仍放在 `app` 模块里（只跑 `testDebugUnitTest`）。抽成独立的
+  `:solver` JVM 模块是更干净的做法，但当前工具链是 AGP 9 的**内置 Kotlin**，额外引入
+  `org.jetbrains.kotlin.jvm` 插件与之搭配需要额外验证，收益（构建隔离）暂时不抵风险。
+  `SolverPurityTest` 已经用测试守住了「不依赖 Android」这条实质约束。
+- Lint 目前 **0 error / 0 warning**（`tools:ignore="NestedWeights"` 是唯一一处抑制，理由是布局里
+  的权重套权重正合语义，见 §3.1）。没有 detekt / ktlint / 覆盖率门槛。
+- `release` 构建**没有开启 R8**（`optimization.enable = false`，见 `app/build.gradle.kts` 的注释）：
+  打开它会影响用户实际安装的那个产物，而开启后只能在真机上验证；本仓库的验证手段停在
+  「能编译、能过测试」，所以没有贸然打开。
+- 广告：`admob_app_id` 仍是 Google 样例 ID；依赖存在但没有任何广告位。发布前要么换成真实 ID，
+  要么连同 `Ads.kt` 与 manifest meta-data 一起移除（后者能顺手删掉一整类启动崩溃风险）。
 
 ---
 
@@ -313,58 +477,76 @@ cd F:/code/Wakusei
 ### P0 —— 让它真的能用（已完成）
 
 - [x] 修数字键映射错位，并改为表驱动防止复发
-- [x] 界面接上求解器：`SOLVE` → 校验 → `solveIt`；`TARGET` → 目标编辑
+- [x] 界面接上求解器：`SOLVE` → 校验 → 求解；`TARGET` → 目标编辑
 - [x] 目标值可编辑、可写回，拉杆保持激活/不激活
 - [x] 调用前校验（≤5、`|x| < 256`、`|target| ≤ 16384`），违规用提示而非崩溃
 - [x] 后台线程求解（`Dispatchers.Default`），期间禁用按钮并显示 `SOLVING…`
 - [x] 输入可编辑：`DEL` 退格、`CLEAR` 按作用域清理、`[+/-]` 取反
-- [x] 结果界面：答案列表 + `BACK`，接上 `action_FirstFragment_to_SecondFragment`
+- [x] 结果界面：答案列表 + `BACK`
 - [x] 统一 256 边界为严格小于（与求解器一致）
 - [x] 允许负数输入（`[+/-]`）
-- [x] `git init` 并提交基线，后续改动可产出真实 diff
 
-### P1 —— 让「全部解」这个目标站得住（语义 + 规模）
+### P1 —— 让「全部解」这个目标站得住（已完成本轮）
 
-- [ ] **明确并实现「解」的规范形式**：交换律 + 结合律规范化（把 `+` / `*` 的连续同级结点展平并按规范序排序），实测可把 `1,2,3,4 → 24` 从 242 条降到 28 条
-- [ ] 去重下沉到求值阶段（用规范形 key 直接进 `Set`），减少字符串拼接
-- [ ] 提供两档输出：`全部字符串` / `本质不同的解`
-- [ ] 剪枝：中间结果明显不可能命中时提前返回 `null`
-- [ ] 修掉运算符枚举的 4 倍浪费（`SignAssign(size - 1)`）
-- [ ] 按**值**而非下标去重排列（有重复数字时只枚举 multiset 的不同排列）
-- [ ] 用**集合 DP** 替代树枚举（`dp[S] = 用集合 S 能得到的值`），量级从 `Catalan × 4^(n-1) × n!` 降到约 `3^n`，让 n=7/8 可行
-- [ ] 溢出治理：`Rational` 换成 `BigInteger` 或加溢出检测
-- [ ] 枚举器改为无状态（`Sequence` + `bucket.copyOf()`），为并行化铺路
-- [ ] 恢复 `size = 6` 的用例，补 `size = 8` 的性能基准
+- [x] **明确「本质不同」的定义**并实现：`+`/`*` 的交换律 + 结合律归一（§2.3），
+      `1,2,3,4 → 24` 从 242 条降到 28 条
+- [x] 提供两档输出：全部表达式 / 本质不同的解（结果界面开关，§3.5）
+- [x] 用**子集 DP** 替代树枚举，去掉「运算符槽位多枚举 4 倍」的浪费
+- [x] 枚举器改为无状态（不可变 `Expression` + 纯函数），可安全重入与并行化
+- [x] 修掉 `Long` 静默溢出：`Rational` 换成 `BigInteger`（§2.2）
+- [x] 打印去掉冗余括号（按优先级 / 结合性，§2.3），并保证可往返解析
+- [x] 补「每个解真的等于 target，且每个数恰好用一次」的验证型测试
+- [x] 补与独立暴力枚举的差分测试（随机 n ≤ 5）
+- [x] 内存预算：宁可快速报错，也不 OOM 或假死（§2.5）
 
-### P2 —— 工程与体验
+### P2 —— 工程与体验（未完成）
 
-- [ ] **让长按阈值 `x` 可配置**（当前固定为系统默认 500 ms）：把 `LONG_PRESS_MS` 抽成可设置项（偏好设置或注入的 `ViewConfiguration` 值），`CLEAR` 与 `DEL` 共用同一来源，并同步 `TUTORIAL.md`
+- [ ] **让长按阈值 `x` 可配置**（当前固定为系统默认 500 ms），`CLEAR` 与 `DEL` 共用同一来源
 - [ ] 答案列表换成 `RecyclerView`（现在解数上千时是单个 TextView）
-- [ ] 决定 FAB 的去留（当前注释保留；不用则删掉 `@dimen/fab_margin`）
-- [ ] 把 `SyntaxTree.kt` / `Rational.kt` 抽成纯 Kotlin JVM 模块（`:solver`），Android 只做 UI
-- [ ] 清理模板残留：`rules.keep`、`values-*` 里多余的 dimens
-- [ ] 广告：把 `admob_app_id` 换成真实 ID（或确定不做广告后移除依赖 + meta-data + `Ads.kt`）
-- [ ] 输出格式优化：去掉冗余括号（按优先级打印）、按复杂度排序、一键复制/导出
-- [ ] 加 `values-zh/strings.xml` 提供中文界面
-- [ ] 补「解集内容都真的等于 target」的验证型测试（随机输入做分数/浮点双重校验）
-- [ ] 配置 CI（GitHub Actions：`./gradlew test` + lint，固定单测 JDK）
+- [ ] 把 `solver/` 抽成纯 Kotlin JVM 模块（`SolverPurityTest` 已守住依赖边界）
+- [ ] 广告：把 `admob_app_id` 换成真实 ID，或确定不做广告后移除依赖 + meta-data + `Ads.kt`
+- [ ] 打开 release 的 R8（`optimization.enable = true`）+ 两个 Fragment 的 keep 规则（已写在
+      `app/src/main/keepRules/rules.keep` 里），并在真机上冒烟验证
+- [ ] 探索 Robolectric 对新 SDK 的支持，去掉每个测试类上的 `@Config(sdk = [34])`
+- [ ] 加 `values-zh-rTW` / 其它语言；把 `TUTORIAL.md` 也翻成中文
+- [ ] 配置 detekt / ktlint，并把 lint 的 warning 也纳入 CI 门槛
+- [ ] 在 CI 上加一个（可选、手动触发的）模拟器 job 跑 `connectedDebugAndroidTest`
 - [ ] 交互增强：允许「不用完所有数字」的变体模式、更多运算符（一元负号、`!`、拼接）
+- [ ] 输出增强：一键复制 / 导出、按「好玩程度」排序
 
 ---
 
 ## 附录 A：复杂度速查
 
 ```
-需要的循环次数（不含浪费）   = Catalan(n-1) · 4^(n-1) · n!
-程序实际循环次数             = Catalan(n-1) · 4^n     · n!     （多跑 4 倍，见 §2.5）
-Catalan(k)                   = C(2k, k) / (k+1)
-本质不同排列数（有重复数字时）= n! / ∏(每个不同数字出现次数的阶乘)
-集合 DP 方案的量级            ≈ 3^n ~ 4^n 级别（含子集合并与去重）
+旧实现实际循环次数        = Catalan(n-1) · 4^n     · n!      （运算符槽位多枚举 4 倍）
+新实现：树形枚举的等价规模 = Catalan(n-1) · 4^(n-1) · n!
+新实现：DP 的切分组合数    = Σ_k C(n,k) · (2^(k-1) - 1)      （无序二分）
+5 个互不相同的数的记忆表   = Σ_k C(n,k) · Catalan(k-1) · 4^(k-1) · k! = 470,485
+Catalan(k)                = C(2k, k) / (k + 1)
+本质不同排列数（有重复数字）= n! / ∏(每个不同数字出现次数的阶乘)
 ```
 
 ## 附录 B：结论是怎么验证的
 
-- §2.5、§2.6 的循环次数、解集大小（242 / 26 / 1 / 2 …）与「交换结合等价类」（242 → 28）来自一份与 `SyntaxTree.kt` **逐结构同构**的 Python 复刻（同样的槽位编号、同样的四进制运算符向量、同样的排列顺序、`fractions.Fraction` 精确运算、同样的全括号打印）实跑得到。
-- 界面行为（键盘布局/尺寸/配色、按键接线、拉杆与写回、CLEAR 点按与长按、DEL 长按与振动、校验、后台求解与结果往返）由 `FirstFragmentTest` 在 Robolectric 上真实驱动验证：启动 `MainActivity` → NavHostFragment → `FirstFragment`，点击/长按并断言文本、Toast、振动常量与布局参数。
-- 广告防护由 `AdsTest` 通过 `PackageManager` 读取与 SDK 相同的 meta-data 来验证。
-- 每轮改动的逐文件真实 diff 见 `diff_[time]_[date].MD`。
+本轮的每个数字都不是「跑一遍自己写的代码然后相信它」：
+
+- **解数（242 / 28 / 26 / 2 / 45 / …）** 来自 [`tools/reference-solver.js`](tools/reference-solver.js)：
+  一份与前一代实现逐结构同构的独立 Node.js 复刻（同样的树形、同样的四进制运算符向量、同样的排列
+  顺序，`BigInt` 精确运算，全括号打印，再用一个自己写的解析器做交换/结合归一），与 app 没有任何共享
+  代码。用 `node tools/reference-solver.js` 可以随时重新打印出这张表。这些期望值被硬编码进
+  `SolverTest.reportsTheIndependentlyVerifiedSolutionCounts`，所以新实现必须去迁就一份它没有参与
+  写出的真相。
+- **穷尽性**由差分测试保证：`BruteForceOracle` 用完全相反的策略（枚举树形 × 运算符 × 排列，
+  完全不共享中间结果）算出解集，断言它与 DP 的输出**逐字符串相等**（随机 n ≤ 4 共 60 组，
+  外加 5 个数的用例）。
+- **打印**由 `ExpressionParser`（按教科书优先级手写的递归下降解析器）验证：每个解打印出来的
+  字符串都能被解析回**结构相同**的树，并在 500 个随机树上做了往返测试。
+- **溢出**由具体算例固定：`255^8 = 17878103347812890625` 超出 `Long.MAX_VALUE`，`Long` 会得到
+  `-568640725896660991`，函数 `RationalTest.arithmeticDoesNotWrapAroundWhereLongWould` 同时断言了
+  两个值。
+- **架构约束**由 `SolverPurityTest` 扫描编译产物的常量池，断言 `solver` 包不出现
+  `android/`、`androidx/` 引用。
+- **界面行为**由 `FirstFragmentTest` 在 Robolectric 上真实驱动：启动 `MainActivity` →
+  NavHostFragment → `FirstFragment`，点击/长按并断言文本、Toast、振动常量、布局参数，
+  包括「旋转一次后输入还在」和「全部/本质开关切换后行数与标题都变」。

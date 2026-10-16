@@ -1,6 +1,7 @@
 <?xml version="1.0" encoding="utf-8"?>
 <LinearLayout
     xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
     xmlns:tools="http://schemas.android.com/tools"
     android:layout_width="match_parent"
     android:layout_height="match_parent"
@@ -8,7 +9,7 @@
     android:padding="16dp"
     tools:context=".SecondFragment">
 
-    <!-- Answers on top: one header line plus the (scrollable) answer list ... -->
+    <!-- Answers on top: one header line, the solution-set switch, and the (scrollable) list ... -->
     <TextView
         android:id="@+id/text_result_header"
         android:layout_width="match_parent"
@@ -16,6 +17,35 @@
         android:textStyle="bold"
         android:textSize="18sp"
         tools:text="242 answer(s) for target 24 from 1, 2, 3, 4" />
+
+    <!-- Every expression vs. one per commutativity/associativity class. Hidden when the two sets
+         are the same list (a single solution, or none), see SecondFragment. -->
+    <com.google.android.material.button.MaterialButtonToggleGroup
+        android:id="@+id/toggle_solution_set"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="8dp"
+        android:visibility="gone"
+        app:selectionRequired="true"
+        app:singleSelection="true"
+        tools:visibility="visible">
+
+        <com.google.android.material.button.MaterialButton
+            android:id="@+id/button_show_all"
+            style="?attr/materialButtonOutlinedStyle"
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_weight="1"
+            tools:text="All (242)" />
+
+        <com.google.android.material.button.MaterialButton
+            android:id="@+id/button_show_essential"
+            style="?attr/materialButtonOutlinedStyle"
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_weight="1"
+            tools:text="Essential (28)" />
+    </com.google.android.material.button.MaterialButtonToggleGroup>
 
     <ScrollView
         android:layout_width="match_parent"
@@ -31,7 +61,7 @@
             android:fontFamily="monospace"
             android:textIsSelectable="true"
             android:textSize="14sp"
-            tools:text="1. (((1 + 2) + 3) * 4)" />
+            tools:text="1. 1 + 2 + 3 * 4" />
     </ScrollView>
 
     <!-- ... and the BACK button at the bottom. -->

@@ -1,12 +1,20 @@
-# Add project specific R8 rules here.
-# AGP will combine all keep rule files in src/main/keepRules to pass to R8
+# R8 keep rules. AGP merges every file in src/main/keepRules and passes it to R8.
 #
-# For more details, see
-#   https://d.android.com/r/tools/r8/keep-rules
+# The release build currently runs WITHOUT R8 (see the `optimization { }` block in
+# app/build.gradle.kts), so nothing below is active yet. These are the rules that have to be in
+# place at the moment it is switched on:
+#
+#     Release builds are not exercised on a device in this repository. Turning R8 on changes the
+#     one artifact users actually install, so enable it together with these rules and smoke-test
+#     the release build — at minimum: launch it, solve 1, 2, 3, 4, and open the result screen.
+#
+# The two screens are referenced by *name* in res/navigation/nav_graph.xml, and Navigation
+# instantiates them reflectively. R8 cannot see that reference, so without these rules a fragment
+# can be renamed or removed and the app crashes as soon as it navigates.
 
-# If your project uses WebView with JS, uncomment the following
-# and specify the fully qualified class name to the JavaScript interface
-# class:
-#-keepclassmembers class fqcn.of.javascript.interface.for.webview {
-#   public *;
-#}
+-keep class com.a24solver.wakusei.FirstFragment { <init>(); }
+-keep class com.a24solver.wakusei.SecondFragment { <init>(); }
+
+# The solver package is reached through FirstFragment, so ordinary reachability keeps it and no
+# rules are needed. It uses java.math.BigInteger and the Kotlin stdlib only, which ship their own
+# rules with the Android plugin.

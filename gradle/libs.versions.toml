@@ -10,11 +10,11 @@ constraintlayout = "2.1.4"
 activityKtx = "1.8.0"
 navigationFragmentKtx = "2.6.0"
 navigationUiKtx = "2.6.0"
-playServicesAds = "25.4.0"
+playServicesAds = "25.5.0"
 runtime = "1.12.1"
 lifecycleRuntimeKtx = "2.6.1"
-coroutines = "1.9.0"
-robolectric = "4.14.1"
+coroutines = "1.11.0"
+robolectric = "4.17"
 
 [libraries]
 androidx-core-ktx = { group = "androidx.core", name = "core-ktx", version.ref = "coreKtx" }

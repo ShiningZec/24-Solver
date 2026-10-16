@@ -13,6 +13,8 @@ import androidx.fragment.app.activityViewModels
 import androidx.lifecycle.lifecycleScope
 import androidx.navigation.fragment.findNavController
 import com.a24solver.wakusei.databinding.FragmentFirstBinding
+import com.a24solver.wakusei.solver.SolveOutcome
+import com.a24solver.wakusei.solver.Solver
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.launch
@@ -24,7 +26,7 @@ import kotlin.math.abs
  *
  * Digits fill the buffer of the active scope: the candidate numbers, or the target while the
  * TARGET latch is on. NEXT commits the buffer, SOLVE validates the input, runs
- * [SyntaxTree.solveIt] on a background dispatcher and then switches to the result screen.
+ * [Solver.solve] on a background dispatcher and then switches to the result screen.
  *
  * CLEAR is scope aware — with the latch off it clears the candidate numbers, with the latch on
  * it resets the target to [DEFAULT_TARGET]; a long press resets both. DEL's long press drops the
@@ -222,7 +224,11 @@ class FirstFragment : Fragment() {
             return false
         }
         if (numbers.size >= MAX_NUMBERS) {
-            toast(getString(R.string.err_max_numbers, MAX_NUMBERS))
+            toast(
+                resources.getQuantityString(
+                    R.plurals.err_max_numbers, MAX_NUMBERS, MAX_NUMBERS
+                )
+            )
             return false
         }
         numbers.add(value)
@@ -266,7 +272,7 @@ class FirstFragment : Fragment() {
             return
         }
 
-        val candidates: Array<Int> = numbers.toTypedArray()
+        val candidates: List<Int> = numbers.toList()
         val targetSnapshot = target
 
         targetLabel = TargetLabel.SOLVING
@@ -275,27 +281,28 @@ class FirstFragment : Fragment() {
 
         solveJob = viewLifecycleOwner.lifecycleScope.launch {
             val outcome = withContext(Dispatchers.Default) {
-                runCatching { SyntaxTree.solveIt(targetSnapshot, candidates) }
+                runCatching { Solver.solve(targetSnapshot, candidates) }
             }
 
             val view = _binding ?: return@launch
             view.buttonSolve.isEnabled = true
 
             outcome
-                .onSuccess { answers ->
+                .onSuccess { solutions ->
                     Log.d(
                         TAG,
-                        "solveIt(target=$targetSnapshot, numbers=${candidates.toList()}) " +
-                            "-> ${answers.size} answer(s)"
+                        "Solver.solve(target=$targetSnapshot, numbers=$candidates) " +
+                            "-> ${solutions.allSolutions.size} answer(s), " +
+                            "${solutions.essentialSolutions.size} essentially different"
                     )
                     targetLabel = TargetLabel.TARGET
                     refreshDisplay()
-                    showAnswers(targetSnapshot, candidates.toList(), answers.sorted())
+                    showAnswers(solutions)
                 }
                 .onFailure { error ->
                     targetLabel = TargetLabel.TARGET
                     refreshDisplay()
-                    Log.w(TAG, "solveIt rejected the input", error)
+                    Log.w(TAG, "the solver rejected the input", error)
                     toast(
                         getString(
                             R.string.err_solver,
@@ -307,21 +314,25 @@ class FirstFragment : Fragment() {
     }
 
     /** Hands the answers to the shared view model and switches to the result screen. */
-    private fun showAnswers(target: Int, numbers: List<Int>, answers: List<String>) {
-        resultViewModel.setResult(SolveResult(target, numbers, answers))
+    private fun showAnswers(solutions: SolveOutcome) {
+        resultViewModel.setResult(solutions)
         if (!isAdded) return
         runCatching { findNavController().navigate(R.id.action_FirstFragment_to_SecondFragment) }
             .onFailure { Log.w(TAG, "could not open the result screen", it) }
     }
 
     /**
-     * Input validation performed before [SyntaxTree.solveIt] is called: at least one and at
-     * most [MAX_NUMBERS] candidates, `abs(candidate) < MAX_ABS_NUMBER` (strict) and
+     * Input validation performed before [Solver.solve] is called: at least one and at most
+     * [MAX_NUMBERS] candidates, `abs(candidate) < MAX_ABS_NUMBER` (strict) and
      * `abs(target) <= MAX_ABS_TARGET`. Returns an error message, or null when input is valid.
      */
     private fun validate(): String? {
         if (numbers.isEmpty()) return getString(R.string.err_no_numbers)
-        if (numbers.size > MAX_NUMBERS) return getString(R.string.err_max_numbers, MAX_NUMBERS)
+        if (numbers.size > MAX_NUMBERS) {
+            return resources.getQuantityString(
+                R.plurals.err_max_numbers, MAX_NUMBERS, MAX_NUMBERS
+            )
+        }
         if (numbers.any { abs(it) >= MAX_ABS_NUMBER }) {
             return getString(R.string.err_number_range, MAX_ABS_NUMBER)
         }
@@ -418,7 +429,38 @@ class FirstFragment : Fragment() {
         super.onViewCreated(view, savedInstanceState)
 
         setupButtons()
+        if (savedInstanceState != null) restoreInput(savedInstanceState)
         refreshDisplay()
+    }
+
+    /**
+     * Keeps what the user has typed across a configuration change (rotation, theme switch, …).
+     *
+     * The candidate list, the target and both uncommitted buffers are plain fields, so without this
+     * they would be silently dropped and the screen would come back empty.
+     */
+    override fun onSaveInstanceState(outState: Bundle) {
+        super.onSaveInstanceState(outState)
+        outState.putIntArray(KEY_NUMBERS, numbers.toIntArray())
+        outState.putInt(KEY_TARGET, target)
+        outState.putString(KEY_NUMBER_INPUT, numberInput)
+        outState.putString(KEY_TARGET_INPUT, targetInput)
+        outState.putBoolean(KEY_TARGET_EDITING, targetEditing)
+    }
+
+    private fun restoreInput(state: Bundle) {
+        numbers.clear()
+        state.getIntArray(KEY_NUMBERS)?.forEach(numbers::add)
+        target = state.getInt(KEY_TARGET, DEFAULT_TARGET)
+        numberInput = state.getString(KEY_NUMBER_INPUT).orEmpty()
+        targetInput = state.getString(KEY_TARGET_INPUT).orEmpty()
+
+        // the widget toggles itself and reports back through the listener, which would clear the
+        // buffer we just restored — so the latch is put back without letting the listener react
+        targetEditing = state.getBoolean(KEY_TARGET_EDITING, false)
+        restoringTargetLatch = true
+        binding.buttonTarget.isChecked = targetEditing
+        restoringTargetLatch = false
     }
 
     override fun onDestroyView() {
@@ -429,6 +471,12 @@ class FirstFragment : Fragment() {
 
     companion object {
         private const val TAG = "FirstFragment"
+
+        private const val KEY_NUMBERS = "numbers"
+        private const val KEY_TARGET = "target"
+        private const val KEY_NUMBER_INPUT = "numberInput"
+        private const val KEY_TARGET_INPUT = "targetInput"
+        private const val KEY_TARGET_EDITING = "targetEditing"
 
         /** Input limits enforced before the solver is called. */
         const val MAX_NUMBERS = 5

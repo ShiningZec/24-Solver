@@ -11,6 +11,7 @@ import androidx.core.view.ViewCompat
 import androidx.navigation.NavController
 import androidx.navigation.fragment.NavHostFragment
 import com.google.android.material.button.MaterialButton
+import com.google.android.material.button.MaterialButtonToggleGroup
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
@@ -54,6 +55,13 @@ class FirstFragmentTest {
     @Before
     fun setUp() {
         controller = Robolectric.buildActivity(MainActivity::class.java).setup()
+        bindFragments()
+    }
+
+    // ------------------------------------------------------------- helpers
+
+    /** Re-reads the fragment tree, e.g. after the activity was recreated. */
+    private fun bindFragments() {
         val fm = controller.get().supportFragmentManager
         fm.executePendingTransactions()
 
@@ -66,8 +74,6 @@ class FirstFragmentTest {
         child.executePendingTransactions()
         root = (child.fragments.first() as FirstFragment).requireView()
     }
-
-    // ------------------------------------------------------------- helpers
 
     private fun text(id: Int): String = root.findViewById<TextView>(id).text.toString()
 
@@ -475,7 +481,7 @@ class FirstFragmentTest {
 
         assertEquals("NUMBERS: 5", text(R.id.text_numbers))
         assertTrue(awaitDestination(R.id.SecondFragment))
-        assertTrue(activityText(R.id.text_result_header).contains("0 answer"))
+        assertTrue(activityText(R.id.text_result_header).contains("0 answers for target 24"))
         assertEquals(
             controller.get().getString(R.string.result_empty),
             activityText(R.id.text_answers)
@@ -497,16 +503,111 @@ class FirstFragmentTest {
 
         // ... and the answers land on the second screen
         assertTrue(awaitDestination(R.id.SecondFragment))
-        assertTrue(activityText(R.id.text_result_header).contains("242 answer(s) for target 24"))
+        assertTrue(activityText(R.id.text_result_header).contains("242 answers for target 24"))
 
         val answers = activityText(R.id.text_answers)
         assertEquals(242, answers.split("\n").size)
-        assertTrue(answers.contains("(((1 + 2) + 3) * 4)"))
+        assertTrue(answers.contains("(1 + 2 + 3) * 4"))
 
         // BACK returns to the input screen
         controller.get().findViewById<Button>(R.id.button_back).performClick()
         shadowOf(Looper.getMainLooper()).idle()
         assertTrue(awaitDestination(R.id.FirstFragment))
         assertEquals("TARGET: 24", activityText(R.id.text_target))
+    }
+
+    @Test
+    fun resultScreenSwitchesBetweenEveryExpressionAndTheEssentialOnes() {
+        for (n in listOf(1, 2, 3, 4)) {
+            type(n)
+            click(R.id.button_next)
+        }
+        click(R.id.button_solve)
+        assertTrue(awaitDestination(R.id.SecondFragment))
+
+        val activity = controller.get()
+        val toggle = activity.findViewById<MaterialButtonToggleGroup>(R.id.toggle_solution_set)
+        assertEquals(View.VISIBLE, toggle.visibility)
+        assertEquals(
+            "All (242)",
+            activity.findViewById<MaterialButton>(R.id.button_show_all).text.toString()
+        )
+        assertEquals(
+            "Essential (28)",
+            activity.findViewById<MaterialButton>(R.id.button_show_essential).text.toString()
+        )
+
+        // the "essential" switch drops the expressions that only differ by commutativity /
+        // associativity of + and *
+        activity.findViewById<MaterialButton>(R.id.button_show_essential).performClick()
+        shadowOf(Looper.getMainLooper()).idle()
+        assertTrue(
+            activityText(R.id.text_result_header)
+                .contains("28 essentially different answers for target 24")
+        )
+        assertEquals(28, activityText(R.id.text_answers).split("\n").size)
+
+        activity.findViewById<MaterialButton>(R.id.button_show_all).performClick()
+        shadowOf(Looper.getMainLooper()).idle()
+        assertEquals(242, activityText(R.id.text_answers).split("\n").size)
+        assertTrue(activityText(R.id.text_result_header).contains("242 answers for target 24"))
+    }
+
+    @Test
+    fun theSolutionSetSwitchIsHiddenWhenThereIsNothingToSwitchBetween() {
+        type(5) // 5 alone cannot reach 24
+        click(R.id.button_solve)
+        assertTrue(awaitDestination(R.id.SecondFragment))
+
+        val toggle = controller.get().findViewById<View>(R.id.toggle_solution_set)
+        assertEquals(View.GONE, toggle.visibility)
+    }
+
+    @Test
+    fun theSolutionSetChoiceSurvivesAConfigurationChange() {
+        for (n in listOf(1, 2, 3, 4)) {
+            type(n)
+            click(R.id.button_next)
+        }
+        click(R.id.button_solve)
+        assertTrue(awaitDestination(R.id.SecondFragment))
+
+        controller.get().findViewById<MaterialButton>(R.id.button_show_essential).performClick()
+        shadowOf(Looper.getMainLooper()).idle()
+        assertEquals(28, activityText(R.id.text_answers).split("\n").size)
+
+        controller.recreate() // the choice lives in the ViewModel, so it has to come back
+        controller.get().supportFragmentManager.executePendingTransactions()
+        shadowOf(Looper.getMainLooper()).idle()
+
+        assertTrue(activityText(R.id.text_result_header).contains("essentially different"))
+        assertEquals(28, activityText(R.id.text_answers).split("\n").size)
+        assertTrue(
+            controller.get().findViewById<MaterialButton>(R.id.button_show_essential).isChecked
+        )
+    }
+
+    @Test
+    fun theInputSurvivesAConfigurationChange() {
+        type(1)
+        click(R.id.button_next)
+        type(9)
+        click(R.id.button_next)
+        type(7) // typed but not committed
+
+        click(R.id.button_target)
+        type(6, 0) // typed into the target buffer, not committed either
+
+        controller.recreate() // rotation
+        bindFragments()
+
+        assertEquals("NUMBERS: 1, 9", text(R.id.text_numbers))
+        assertEquals("TARGET: 24", text(R.id.text_target)) // still uncommitted
+        assertEquals("TARGET INPUT: 60", text(R.id.text_current_input))
+        assertTrue(targetLatch().isChecked) // the latch is restored as well
+
+        click(R.id.button_target) // leaving the scope commits the restored buffer
+        assertEquals("TARGET: 60", text(R.id.text_target))
+        assertEquals("INPUT: 7", text(R.id.text_current_input)) // the other buffer survived too
     }
 }

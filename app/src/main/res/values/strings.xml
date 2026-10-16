@@ -1,6 +1,6 @@
 <resources>
-    <string name="app_name">24 Solver</string>
-    <string name="action_settings">Settings</string>
+    <!-- The product's name, not a label: it stays the same in every locale. -->
+    <string name="app_name" translatable="false">24 Solver</string>
     <!-- Labels shown in the action bar by the navigation graph -->
     <string name="first_fragment_label">24 Solver</string>
     <string name="second_fragment_label">Answers</string>
@@ -8,7 +8,7 @@
     <!-- Input screen: labels applied by FirstFragment.refreshDisplay() -->
     <!-- e.g. "TARGET: 24" -->
     <string name="target_label">TARGET: %1$d</string>
-    <!-- Shown while SyntaxTree.solveIt() runs on a background dispatcher -->
+    <!-- Shown while Solver.solve() runs on a background dispatcher -->
     <string name="solving">SOLVING…</string>
     <!-- e.g. "NUMBERS: 1, 2, 3" -->
     <string name="numbers_label">NUMBERS: %1$s</string>
@@ -27,12 +27,28 @@
     <string name="btn_sign">+/-</string>
     <string name="btn_back">BACK</string>
 
+    <!-- Keypad digit labels. Not translatable: the keys type the ASCII digits the input parser
+         accepts, so they must not follow the locale's numbering system. -->
+    <string name="digit_0" translatable="false">0</string>
+    <string name="digit_1" translatable="false">1</string>
+    <string name="digit_2" translatable="false">2</string>
+    <string name="digit_3" translatable="false">3</string>
+    <string name="digit_4" translatable="false">4</string>
+    <string name="digit_5" translatable="false">5</string>
+    <string name="digit_6" translatable="false">6</string>
+    <string name="digit_7" translatable="false">7</string>
+    <string name="digit_8" translatable="false">8</string>
+    <string name="digit_9" translatable="false">9</string>
+
     <!-- Hints / errors -->
-    <!-- A single CLEAR press is silent; only the deliberate two-press reset reports back. -->
+    <!-- A single CLEAR press is silent; only the deliberate long press reports back. -->
     <string name="msg_cleared_all">All Numbers Set to Default</string>
     <string name="err_empty_input">Enter a number first</string>
     <string name="err_no_numbers">Add at least one number before solving (type digits, then NEXT)</string>
-    <string name="err_max_numbers">At most %1$d candidate numbers are allowed</string>
+    <plurals name="err_max_numbers">
+        <item quantity="one">At most %1$d candidate number is allowed</item>
+        <item quantity="other">At most %1$d candidate numbers are allowed</item>
+    </plurals>
     <string name="err_number_range">Each candidate number must satisfy |x| &lt; %1$d</string>
     <string name="err_target_range">The target must be within ±%1$d</string>
     <string name="err_solver">Solver rejected the input: %1$s</string>
@@ -45,7 +61,17 @@
     <string name="admob_app_id" translatable="false">ca-app-pub-3940256099942544~3347511713</string>
 
     <!-- Result screen -->
-    <string name="result_header">%1$d answer(s) for target %2$d from %3$s</string>
+    <plurals name="result_header">
+        <item quantity="one">%1$d answer for target %2$d from %3$s</item>
+        <item quantity="other">%1$d answers for target %2$d from %3$s</item>
+    </plurals>
+    <plurals name="result_header_essential">
+        <item quantity="one">%1$d essentially different answer for target %2$d from %3$s</item>
+        <item quantity="other">%1$d essentially different answers for target %2$d from %3$s</item>
+    </plurals>
     <string name="result_line">%1$d. %2$s</string>
     <string name="result_empty">No expression built from these numbers reaches the target.</string>
+    <!-- The switch between every expression and one per equivalence class -->
+    <string name="result_toggle_all">All (%1$d)</string>
+    <string name="result_toggle_essential">Essential (%1$d)</string>
 </resources>
