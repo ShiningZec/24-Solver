@@ -138,13 +138,24 @@ class FirstFragment : Fragment() {
     }
 
     /**
-     * DEL long press ([LONG_PRESS_MS]): drops the last committed candidate number. The tick is
-     * emitted only when a number was actually removed, so the key stays quiet (and harmless) when
-     * the list is already empty.
+     * DEL long press ([LONG_PRESS_MS]): "throw away what I am typing; if I am not typing anything,
+     * take back the last number I committed".
+     *
+     *  1. the buffer of the active scope is not empty → empty it. The active scope is the candidate
+     *     numbers, or the target while the TARGET latch is on: the same scope a DEL *tap* edits, so
+     *     the two variants of the key always act on the same thing.
+     *  2. nothing typed but numbers committed → drop the last one.
+     *  3. neither → nothing at all, not even a tick.
+     *
+     * The tick marks the two cases where something really went away (see [hapticFeedback]); the
+     * key's sound is the keypad's, not a report of what happened, so it plays either way.
      */
     private fun onDeleteLongPressed() {
-        if (numbers.isEmpty()) return
-        numbers.removeAt(numbers.lastIndex)
+        when {
+            buffer.isNotEmpty() -> setBuffer("")
+            numbers.isNotEmpty() -> numbers.removeAt(numbers.lastIndex)
+            else -> return
+        }
         hapticFeedback(binding.buttonDel)
         onInputChanged()
     }

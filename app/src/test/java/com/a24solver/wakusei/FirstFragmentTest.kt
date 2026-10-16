@@ -442,10 +442,55 @@ class FirstFragmentTest {
     }
 
     @Test
+    fun deleteLongPressClearsWhatIsBeingTypedBeforeTouchingTheNumbers() {
+        type(4)
+        click(R.id.button_next) // NUMBERS: 4
+        type(7, 2)
+        assertEquals("INPUT: 72", text(R.id.text_current_input))
+
+        longClick(R.id.button_del)
+
+        assertEquals(
+            "what is being typed goes first",
+            "INPUT: _",
+            text(R.id.text_current_input)
+        )
+        assertEquals("and the committed numbers are left alone", "NUMBERS: 4", text(R.id.text_numbers))
+        assertEquals(HapticFeedbackConstants.KEYBOARD_TAP, lastAppHaptic())
+        assertEquals("a long press never reports with a toast", 0, toastCount())
+    }
+
+    @Test
+    fun deleteLongPressOnAnEmptyInputTakesBackTheLastNumber() {
+        type(4)
+        click(R.id.button_next)
+        type(7)
+        click(R.id.button_next) // NUMBERS: 4, 7, and nothing typed
+
+        longClick(R.id.button_del) // input is empty → the numbers are next in line
+        assertEquals("INPUT: _", text(R.id.text_current_input))
+        assertEquals("NUMBERS: 4", text(R.id.text_numbers))
+    }
+
+    @Test
+    fun deleteLongPressClearsTheTargetInputWhileTheLatchIsOn() {
+        click(R.id.button_target) // the latch is on: digits edit the target
+        type(1, 2)
+        assertEquals("TARGET INPUT: 12", text(R.id.text_current_input))
+
+        longClick(R.id.button_del)
+
+        assertEquals("TARGET INPUT: _", text(R.id.text_current_input))
+        assertEquals("the target itself is untouched", "TARGET: 24", text(R.id.text_target))
+        assertEquals(HapticFeedbackConstants.KEYBOARD_TAP, lastAppHaptic())
+    }
+
+    @Test
     fun deleteLongPressWithNoCandidatesStaysQuiet() {
         longClick(R.id.button_del)
 
         assertEquals("NUMBERS: (none)", text(R.id.text_numbers))
+        assertEquals("INPUT: _", text(R.id.text_current_input))
         assertEquals("nothing was removed, so nothing ticks", -1, lastAppHaptic())
         assertEquals(0, toastCount())
     }
