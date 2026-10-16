@@ -8,24 +8,27 @@ class MelodiesTest {
 
     @Test
     fun theKeypadDrawsFromEightNotes() {
+        // the specification's "C, D, E, sharp F, G, A, flat B, high C", in the fourth/fifth octave
         assertEquals(
-            listOf("C", "D", "E", "F#", "G", "A", "Bb", "C5"),
+            listOf("C4", "D4", "E4", "F#4", "G4", "A4", "Bb4", "C5"),
             Melodies.KEYPAD_NOTES.map { it.noteName }
         )
     }
 
     @Test
     fun solvePlaysTheSixNoteBluesScale() {
+        // "C, flat E, sharp F, G, flat B, B"
         assertEquals(
-            listOf("C", "Eb", "F#", "G", "Bb", "B"),
+            listOf("C4", "Eb4", "F#4", "G4", "Bb4", "B4"),
             Melodies.SOLVE_SCALE.map { it.noteName }
         )
     }
 
     @Test
     fun theResetGesturePlaysTheMajorThirdArpeggio() {
+        // "E, sharp G, high C"
         assertEquals(
-            listOf("E", "G#", "C5"),
+            listOf("E4", "G#4", "C5"),
             Melodies.RESET_SCALE.map { it.noteName }
         )
     }

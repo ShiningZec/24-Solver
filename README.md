@@ -420,6 +420,12 @@ ViewCompat.setOnApplyWindowInsetsListener(binding.main) { view, insets ->
 - 那 15 个键共用**一个洗牌袋**（`NoteQueue`）：八个音各响一次之前不会重复，响完自动重洗，
   所以连按一串键听起来是一条走遍八度的旋律，而不是同一个音反复敲。`KeypadSoundTest` 会把这
   15 个键全部按一遍，再逐段比对波形，确认前八个音**正好是八个不同的音高**。
+- 音高表 `Pitch` 是 **A♭3 → F#5 的完整半音列（23 个音）**，按音高升序排列，`Pitch.entries`
+  就是整条半音阶。想换音阶或让某个键只发某一个音，只需要改 `Melodies` 里那几个常量
+  （比如把 `RESET_SCALE` 换成 `listOf(Pitch.F4)`），别处都不用动。
+  加一个音是**一行**：Kotlin 名、显示用拼写、MIDI 号；频率不是硬编码的，而是由 MIDI 号在
+  十二平均律下算出来（A4 = 440 Hz），所以既不会因为小数打错而差几音分，也能一眼看出表里
+  `56, 57, 58, …` 有没有缺口 —— `PitchTest` 就是把这两件事钉住的。
 - 「不阻碍主进程」是设计的一部分：`ToneEngine.play()` 把工作丢给后台线程就返回（队列只保留最新几段
   音频，连按不会越拖越久）；`ToneEngineTest` 用一个每次睡 400ms 的假 sink 证明调用方在 100ms 内
   返回。一个音符要响几百毫秒，所以用了**两个**工作线程，并且新音符会**切掉**仍在响的旧音符
@@ -477,6 +483,7 @@ ViewCompat.setOnApplyWindowInsetsListener(binding.main) { view, insets ->
 | `sound.ToneSynthesizerTest` | 长度、峰值不削波、衰减、起始无爆音、**自相关测出基频与音高一致**、静音、音阶拼接 | 9 |
 | `sound.NoteQueueTest` | 八音用完才重复、每轮重洗、`reset`、空队列被拒 | 5 |
 | `sound.ToneEngineTest` | 一段音阶一次写入、每次调用都发声、**play() 不阻塞调用方**、第二段不等第一段响完、音频设备失败被吞、shutdown 释放 | 6 |
+| `sound.PitchTest` | 半音列从 A♭3 到 F#5 无缺口且升序、每步正好一个半音、频率对上标准表、八度正好翻倍、音名拼写、2200 音分 | 8 |
 | `sound.MelodiesTest` | 三个音列与需求逐音对齐、音高符合十二平均律 | 4 |
 | `SolveResultViewModelTest` | 显示哪一份解集、两组相同时回落到「全部」、选择随 ViewModel 保留 | 4 |
 | `BottomControlsTest` | 系统栏 insets 真的被应用到根视图、布局没有重复 fit、`SOLVE` / `BACK` 落在导航栏之上且留有底部余量（Robolectric 里派发合成 insets） | 4 |
@@ -484,13 +491,13 @@ ViewCompat.setOnApplyWindowInsetsListener(binding.main) { view, insets ->
 | `IconTest` | 图标资源可解析（自适应图标 + 两层 drawable）、标记落在 66dp 安全圆内、两道标记不重叠 | 3 |
 | `LaunchSmokeTest`（androidTest） | 应用能在真机上启动并显示输入界面 | 1 |
 
-单元测试共 **133** 例。
+单元测试共 **141** 例。
 
 ### 4.2 构建与测试命令
 
 ```bash
 cd F:/code/Wakusei
-./gradlew.bat :app:testDebugUnitTest   # 全部单元测试（133 例，约 40 s）
+./gradlew.bat :app:testDebugUnitTest   # 全部单元测试（141 例，约 40 s）
 ./gradlew.bat :app:lintDebug           # Android Lint（当前应无 error / warning）
 ./gradlew.bat :app:assembleDebug       # 打 debug APK
 ./gradlew.bat :app:assembleDebugAndroidTest   # 编译仪器测试

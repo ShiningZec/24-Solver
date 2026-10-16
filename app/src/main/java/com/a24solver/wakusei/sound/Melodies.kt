@@ -5,6 +5,10 @@ import kotlin.random.Random
 /**
  * The note material of the keypad, spelled out in one place so the sounds can be read off the
  * specification and checked by tests.
+ *
+ * Every entry is a [Pitch], and the full chromatic range on offer is `Pitch.entries` (A♭3 up to
+ * F#5) — so swapping a scale, or making a key play a single different note, means naming different
+ * constants here and nothing else.
  */
 object Melodies {
 

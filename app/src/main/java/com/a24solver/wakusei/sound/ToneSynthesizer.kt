@@ -46,6 +46,8 @@ object ToneSynthesizer {
         val count = samplesFor(durationMs, sampleRate)
         val out = ShortArray(count)
         val duration = count.toDouble() / sampleRate
+        // hoisted: Pitch.frequencyHz is computed, and this loop runs once per sample per mode
+        val fundamental = pitch.frequencyHz
         // the fundamental's amplitude falls by e^-1 over a third of the note
         val decayTau = duration / 3.0
         val amplitudeSum = MODE_AMPLITUDES.sum()
@@ -58,7 +60,7 @@ object ToneSynthesizer {
                 val modeTau = decayTau / MODE_DECAY_FACTORS[mode]
                 sample += MODE_AMPLITUDES[mode] *
                     exp(-seconds / modeTau) *
-                    sin(2.0 * PI * pitch.frequencyHz * MODE_RATIOS[mode] * seconds)
+                    sin(2.0 * PI * fundamental * MODE_RATIOS[mode] * seconds)
             }
             out[index] = (sample * peak * envelope(seconds, duration)).toInt().toShort()
         }
