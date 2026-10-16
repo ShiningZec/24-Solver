@@ -7,6 +7,25 @@
     <!-- The explicit parent="" stops Android from looking for an implicit "Widget.App" style. -->
     <style name="Widget.App.KeypadButton" parent="">
         <item name="android:textSize">20sp</item>
+
+        <!-- A keypad key is a third of the screen wide — about 100dp — and the Material button
+             style spends 24dp of that on padding at each end, which leaves ~53dp for the label.
+             "TARGET" needs about 82dp at 20sp and "クリア" about 60dp, so the default padding is
+             what makes them wrap. A keypad key is a narrow tile, not a wide dialog button: 4dp per
+             side is all the breathing room it needs, and it hands ~40dp back to the label. -->
+        <item name="android:paddingStart">4dp</item>
+        <item name="android:paddingEnd">4dp</item>
+
+        <!-- Never wrap a key label... -->
+        <item name="android:maxLines">1</item>
+
+        <!-- ...and if it still does not fit — a narrow screen, or a user whose system font scale is
+             large — shrink it rather than clip it. The label is readable down to 12sp, and at that
+             size even "TARGET" fits the tile, so a label is never cut off. -->
+        <item name="autoSizeTextType">uniform</item>
+        <item name="autoSizeMinTextSize">12sp</item>
+        <item name="autoSizeMaxTextSize">20sp</item>
+        <item name="autoSizeStepGranularity">1sp</item>
     </style>
 
     <!-- The five "special" keys ([+/-] [NEXT] [CLEAR] [TARGET] [DEL]) additionally carry the

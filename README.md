@@ -275,6 +275,17 @@ INPUT: 12 / TARGET INPUT: 12  ← text_current_input（当前缓冲 + 当前模�
 - 每个键有 `4dp` 的左右外边距（`layout_marginStart/End`）形成间隙；按键文字 `20sp`
   （`values/styles.xml` 的 `Widget.App.KeypadButton`）。数字键的文案来自 `@string/digit_*`
   （`translatable="false"`：键盘输入的是解析器接受的 ASCII 数字，不应跟随地区数字形状）。
+- **按键文字不换行、也不会被裁掉**（`KeypadLabelFitTest` 守着）：
+  - 一个键只有约 100dp 宽（屏宽的三分之一），而 Material 按钮样式在**左右各花 24dp 内边距**
+    ——留给文字只剩约 53dp。`TARGET` 在 20sp 下要约 82dp、`クリア` 约 60dp，所以英文的
+    CLEAR/TARGET 与日文的クリア 会换行；实测把内边距改回默认值的话，**即使把字号缩到 12sp，
+    `TARGET` 仍然放不下（会被裁切）**，所以瓶颈是内边距，不是可用宽度。
+  - 因此键盘键的内边距收到 **4dp/侧**（文字区 53dp → 93dp，上面几个词在 20sp 下全部放得下），
+    并加 `maxLines=1` 禁止换行；再用**自动缩小**（12–20sp，1sp 步进）作为兜底——系统字号放大
+    或屏幕更窄时，文字缩小而不是被裁掉。`SOLVE` 是整行宽按钮，保留 Material 默认内边距。
+  - Robolectric 无法用真实字体度量文字宽度，所以测试用的是**保守估算**（拉丁字母 0.75em、
+    CJK/假名 1em）；它能精确断言的是那些让文字放得下的布局属性，以及「缩到最小 12sp 时最长的
+    标签仍然放得下」（即永远不需要裁切）。
 - 键盘整体包在 `@id/keypad` 容器里，权重 4；其下是 `@id/keypad_spacer`（权重 1）。因此键盘区
   高度恰为原先行区空间的 **80%**。该容器内是 5 行等权重的 `LinearLayout`——即「权重套权重」，
   这是表达「5 行等分固定的 80% 高度」最直接的方式，故在布局里对 `NestedWeights` 做了**带说明的
@@ -511,18 +522,19 @@ ViewCompat.setOnApplyWindowInsetsListener(binding.main) { view, insets ->
 | `sound.ToneEngineTest` | 一条乐句一次写入、同一乐句只合成一次、每次调用都发声、**play() 不阻塞调用方**、第二段不等第一段响完、音频设备失败被吞、shutdown 释放 | 7 |
 | `sound.MelodiesTest` | 当前音集/音阶/琶音逐音对齐、开头音不在袋里、音高符合十二平均律 | 5 |
 | `SolveResultViewModelTest` | 显示哪一份解集、两组相同时回落到「全部」、选择随 ViewModel 保留 | 4 |
+| `KeypadLabelFitTest` | 键盘键内边距 4dp（含 resolve 后的 left/right）、`maxLines=1`、自动缩小开启且范围正确；中/英/日文案在最小 12sp 下都放得下（保守字宽估算） | 7 |
 | `BottomControlsTest` | 系统栏 insets 真的被应用到根视图、布局没有重复 fit、`SOLVE` / `BACK` 落在导航栏之上且留有底部余量（Robolectric 里派发合成 insets） | 4 |
 | `AdsTest` | app ID 声明、异常防护、初始化不抛 | 3 |
 | `IconTest` | 图标资源可解析（自适应图标 + 两层 drawable）、标记落在 66dp 安全圆内、两道标记不重叠 | 3 |
 | `LaunchSmokeTest`（androidTest） | 应用能在真机上启动并显示输入界面 | 1 |
 
-单元测试共 **196** 例。
+单元测试共 **203** 例。
 
 ### 4.2 构建与测试命令
 
 ```bash
 cd F:/code/Wakusei
-./gradlew.bat :app:testDebugUnitTest   # 全部单元测试（196 例，约 70 s）
+./gradlew.bat :app:testDebugUnitTest   # 全部单元测试（203 例，约 70 s）
 ./gradlew.bat :app:lintDebug           # Android Lint（当前应无 error / warning）
 ./gradlew.bat :app:assembleDebug       # 打 debug APK
 ./gradlew.bat :app:assembleDebugAndroidTest   # 编译仪器测试
