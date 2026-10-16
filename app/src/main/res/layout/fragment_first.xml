@@ -252,10 +252,13 @@
         android:layout_height="0dp"
         android:layout_weight="1" />
 
-    <!-- SOLVE is deliberately taller than a default button (~+20%). -->
+    <!-- SOLVE is deliberately taller than a default button (~+20%), and carries
+         @dimen/bottom_action_clearance of free space underneath so that it never ends up within
+         reach of the system navigation keys. -->
     <Button
         android:id="@+id/button_solve"
         android:layout_width="match_parent"
-        android:layout_height="56dp"
+        android:layout_height="@dimen/action_button_height"
+        android:layout_marginBottom="@dimen/bottom_action_clearance"
         android:text="@string/btn_solve" />
 </LinearLayout>

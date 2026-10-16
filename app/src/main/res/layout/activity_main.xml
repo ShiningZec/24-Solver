@@ -4,16 +4,18 @@
     android:id="@+id/main"
     android:layout_width="match_parent"
     android:layout_height="match_parent"
-    android:fitsSystemWindows="true"
     tools:context=".MainActivity">
 
     <!-- Top bar: it stays (it carries the screen title and the up arrow of
          setupActionBarWithNavController) but takes less vertical space — 40dp instead of the
-         default ?attr/actionBarSize (56dp), so the app name strip is shorter. -->
+         default ?attr/actionBarSize (56dp), so the app name strip is shorter.
+
+         Neither this layout nor its app bar sets android:fitsSystemWindows: MainActivity applies
+         the system bar insets itself (see the insets listener there). Doing both pads the top
+         twice and still leaves the bottom under the navigation bar. -->
     <com.google.android.material.appbar.AppBarLayout
         android:layout_width="match_parent"
-        android:layout_height="40dp"
-        android:fitsSystemWindows="true">
+        android:layout_height="40dp">
 
         <com.google.android.material.appbar.MaterialToolbar
             android:id="@+id/toolbar"

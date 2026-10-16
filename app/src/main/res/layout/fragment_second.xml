@@ -64,11 +64,13 @@
             tools:text="1. 1 + 2 + 3 * 4" />
     </ScrollView>
 
-    <!-- ... and the BACK button at the bottom. -->
+    <!-- ... and the BACK button at the bottom, with @dimen/bottom_action_clearance of free space
+         underneath so that it never ends up within reach of the system navigation keys. -->
     <Button
         android:id="@+id/button_back"
         android:layout_width="match_parent"
-        android:layout_height="wrap_content"
+        android:layout_height="@dimen/action_button_height"
         android:layout_marginTop="8dp"
+        android:layout_marginBottom="@dimen/bottom_action_clearance"
         android:text="@string/btn_back" />
 </LinearLayout>

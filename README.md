@@ -69,6 +69,7 @@ Wakusei/
         │   │   ├── BruteForceOracle.kt    # ★ 测试用的独立暴力枚举（差分基准）
         │   │   └── ExpressionParser.kt    # ★ 测试用的独立解析器（验证打印可往返）
         │   ├── FirstFragmentTest.kt       # Robolectric：键盘、拉杆、手势、校验、结果往返
+        │   ├── BottomControlsTest.kt      # Robolectric：系统栏 insets 与底部按钮不被导航栏遮挡
         │   ├── SolveResultViewModelTest.kt# 结果界面的显示规则与选择保持
         │   ├── AdsTest.kt                 # 广告防护
         │   └── IconTest.kt                # 图标资源与 66dp 安全区几何
@@ -255,7 +256,11 @@ INPUT: 12 / TARGET INPUT: 12  ← text_current_input（当前缓冲 + 当前模�
   高度恰为原先行区空间的 **80%**。该容器内是 5 行等权重的 `LinearLayout`——即「权重套权重」，
   这是表达「5 行等分固定的 80% 高度」最直接的方式，故在布局里对 `NestedWeights` 做了**带说明的
   局部抑制**（层次固定为 5 行、只多一次测量，代价可忽略）。
-- `SOLVE` 固定 `56dp`（默认 wrap_content 约 48dp，即约 +20%）。
+- `SOLVE` 固定 `@dimen/action_button_height`（56dp，默认 wrap_content 约 48dp，即约 +20%），
+  其下再留 `@dimen/bottom_action_clearance`（56dp，约一个按钮高）的空隙；结果界面的 `BACK`
+  用同一对尺寸。**这是为了解决「底部的按钮太贴近屏幕下缘、在部分机型上会被系统导航键挡住」**：
+  系统栏 insets 已经保证按钮不会被压在导航栏底下（见 §3.6），这 56dp 是在此之上留出的可点按余量
+  ——导航栏较高的机型（平板任务栏、横屏挖孔、大号系统栏）也不会让按钮贴着那条边界。
 - 特殊键（`[+/-] [NEXT] [CLEAR] [TARGET] [DEL]`）用 `Widget.App.KeypadButton.Special`：
   `backgroundTint` 指向 `res/color/button_rose_tint.xml`（默认玫红 `#D81B60` / 拉杆激活 `#AD1457` /
   禁用淡玫红），白字。
@@ -336,12 +341,31 @@ state，必须保持小体积）并 `navigate(action_FirstFragment_to_SecondFrag
 
 按 `BACK` 再返回结果界面时，选择仍然保留（选择状态存在 ViewModel 里，rotate 亦然）。
 
-### 3.6 窗口 insets
+### 3.6 窗口 insets 与底部按钮
 
-`enableEdgeToEdge()` + 布局里 `CoordinatorLayout` 与 `AppBarLayout` 的
-`android:fitsSystemWindows="true"` 是**声明式**的 insets 处理。这里刻意**没有**再叠加
-`ViewCompat.setOnApplyWindowInsetsListener`：两者同时存在时，根布局会先按状态栏内边距 padding
-一次，子 `AppBarLayout` 又消费一次，顶栏被下推整整两个状态栏高度。（此前代码里两者都有。）
+`enableEdgeToEdge()` 让窗口铺满整屏（连导航栏区域也画进去），因此**应用必须自己**把内容让开系统栏。
+这件事在 `MainActivity` 里显式做，一次覆盖两个界面：
+
+```kotlin
+ViewCompat.setOnApplyWindowInsetsListener(binding.main) { view, insets ->
+    val systemBars = insets.getInsets(WindowInsetsCompat.Type.systemBars())
+    view.setPadding(systemBars.left, systemBars.top, systemBars.right, systemBars.bottom)
+    insets
+}
+```
+
+布局里**刻意不写** `android:fitsSystemWindows`。曾经的写法正是只依赖这个开关，结果是：顶栏被状态栏
+内边距推了一次（但现在连监听器都没有，所以那次是「只推一次」），而**屏幕底部完全没有让开导航栏**
+——`SOLVE` / `BACK` 因此落在系统导航键的可触区域内，在导航栏较高的机型上很难按下。两个机制同时用
+又是另一个极端：顶部被推两次。
+
+所以现在的分工是：**insets 保证按钮永远不在导航栏底下，`@dimen/bottom_action_clearance`
+（56dp ≈ 一个按钮高）保证按钮离屏幕下缘有舒服的一段距离**（见 §3.1）。
+
+`BottomControlsTest` 把这条约定钉住了：它向根视图派发一份合成的系统栏 insets（状态栏 24dp、
+导航栏 96dp——故意比那 56dp 的余量更高，否则光靠余量也能「碰巧通过」，测不出 insets 有没有生效），
+然后断言根视图的内边距、两个布局都没有自己 fit system windows、并且 `SOLVE` / `BACK` 的底边确实落在
+导航栏顶边之上。把 inset 那行代码删掉，这个测试会失败 3 条——它是有牙齿的。
 
 ### 3.7 广告依赖的异常防护
 
@@ -371,17 +395,18 @@ state，必须保持小体积）并 `navigate(action_FirstFragment_to_SecondFrag
 | `SolverPurityTest` | `solver` 包编译产物不引用 `android`/`androidx` | 1 |
 | `FirstFragmentTest` | 键盘布局/尺寸/配色、按键接线、拉杆与写回、CLEAR 点按与长按、DEL 长按、校验、后台求解与结果往返、全部/本质切换及其旋转保持、旋转不丢输入（Robolectric） | 29 |
 | `SolveResultViewModelTest` | 显示哪一份解集、两组相同时回落到「全部」、选择随 ViewModel 保留 | 4 |
+| `BottomControlsTest` | 系统栏 insets 真的被应用到根视图、布局没有重复 fit、`SOLVE` / `BACK` 落在导航栏之上且留有底部余量（Robolectric 里派发合成 insets） | 4 |
 | `AdsTest` | app ID 声明、异常防护、初始化不抛 | 3 |
 | `IconTest` | 图标资源可解析（自适应图标 + 两层 drawable）、标记落在 66dp 安全圆内、两道标记不重叠 | 3 |
 | `LaunchSmokeTest`（androidTest） | 应用能在真机上启动并显示输入界面 | 1 |
 
-单元测试共 **69** 例。
+单元测试共 **73** 例。
 
 ### 4.2 构建与测试命令
 
 ```bash
 cd F:/code/Wakusei
-./gradlew.bat :app:testDebugUnitTest   # 全部单元测试（69 例，约 25 s）
+./gradlew.bat :app:testDebugUnitTest   # 全部单元测试（73 例，约 25 s）
 ./gradlew.bat :app:lintDebug           # Android Lint（当前应无 error）
 ./gradlew.bat :app:assembleDebug       # 打 debug APK
 ./gradlew.bat :app:assembleDebugAndroidTest   # 编译仪器测试

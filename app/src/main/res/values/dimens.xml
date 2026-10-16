@@ -1,0 +1,15 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- The full-width action button at the bottom of each screen (SOLVE on the input screen,
+         BACK on the result screen). -->
+    <dimen name="action_button_height">56dp</dimen>
+
+    <!-- Free space kept *under* that button, about one button height.
+
+         The system bar insets applied by MainActivity already keep the button out of the
+         navigation bar, but on devices with a chunky navigation bar (or a gesture bar that reports
+         only a thin inset) a button flush against that boundary is awkward to hit. This is the
+         extra breathing room that makes the target comfortably reachable either way; the two values
+         are separate so the button can be resized without silently changing the clearance. -->
+    <dimen name="bottom_action_clearance">56dp</dimen>
+</resources>

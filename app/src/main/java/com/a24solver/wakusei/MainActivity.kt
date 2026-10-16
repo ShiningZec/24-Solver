@@ -3,6 +3,8 @@ package com.a24solver.wakusei
 import android.os.Bundle
 import androidx.appcompat.app.AppCompatActivity
 import androidx.activity.enableEdgeToEdge
+import androidx.core.view.ViewCompat
+import androidx.core.view.WindowInsetsCompat
 import androidx.navigation.fragment.NavHostFragment
 import androidx.navigation.ui.AppBarConfiguration
 import androidx.navigation.ui.navigateUp
@@ -33,11 +35,14 @@ import com.a24solver.wakusei.databinding.ActivityMainBinding
  * Single-activity shell: a [NavHostFragment] with the two screens of the app (input and results)
  * and a 40dp toolbar that shows the current screen's title and the up arrow.
  *
- * Window insets are handled declaratively: the root layout and its app bar carry
- * `android:fitsSystemWindows="true"`, which is what makes the content avoid the status and
- * navigation bars under [enableEdgeToEdge]. There is deliberately no
- * `ViewCompat.setOnApplyWindowInsetsListener` here as well — that would pad the same insets a
- * second time and push the toolbar down by an extra status bar.
+ * Window insets are applied **here**, explicitly, to the root view: under [enableEdgeToEdge] the
+ * window spans the whole screen, so the app itself has to keep its content out of the status and
+ * navigation bars. Padding the root by the system bar insets does that once, for every screen.
+ *
+ * The layouts deliberately carry no `android:fitsSystemWindows` attribute. Relying on that flag
+ * instead is the trap this code fell into before: it keeps the top clear but leaves the *bottom* of
+ * the screen under the navigation bar, which put the SOLVE and BACK buttons within reach of the
+ * system navigation keys; and combining the flag with a listener pads the top twice.
  */
 class MainActivity : AppCompatActivity() {
 
@@ -55,6 +60,12 @@ class MainActivity : AppCompatActivity() {
 
         binding = ActivityMainBinding.inflate(layoutInflater)
         setContentView(binding.root)
+
+        ViewCompat.setOnApplyWindowInsetsListener(binding.main) { view, insets ->
+            val systemBars = insets.getInsets(WindowInsetsCompat.Type.systemBars())
+            view.setPadding(systemBars.left, systemBars.top, systemBars.right, systemBars.bottom)
+            insets
+        }
 
         setSupportActionBar(binding.toolbar)
 
