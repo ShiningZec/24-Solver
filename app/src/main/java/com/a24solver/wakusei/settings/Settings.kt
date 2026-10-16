@@ -109,46 +109,27 @@ class Settings(context: Context) {
         )
 
     /**
-     * Records [language] as the one to use. Nothing changes on screen: the switch happens the next
-     * time the app starts, via [applyRequestedLanguage].
+     * Records [language] as the one to use. Nothing changes on screen yet: the switch happens when
+     * the settings screen is left, via [applyRequestedLanguage].
      *
      * Applying it here instead would recreate every screen the moment the user touches the list —
-     * including the settings screen they are standing on, mid-scroll — and a language is not
-     * something anyone needs before their next launch.
+     * including the settings screen they are standing on, mid-scroll.
      */
     fun requestLanguage(language: AppLanguage) {
         preferences.edit { putString(KEY_LANGUAGE, language.languageTag) }
     }
 
     /**
-     * Puts [requestedLanguage] into effect. Called once per process, before any screen exists.
+     * Puts [requestedLanguage] into effect. Called when the settings screen is left, and once at
+     * start-up so a choice made before the process died is not lost.
      *
-     * If the app is running in a language that is neither what was requested nor what was applied
-     * last time, someone changed it outside the app — Android's per-app language settings — and that
-     * choice is adopted rather than overridden. Tracking what *we* applied is what makes the
-     * difference: without it, switching back to "follow the system" would look like an outside
-     * change and would refuse to take effect.
+     * The choice made in the app always wins, deliberately: it is the newest thing the user said
+     * about the language. A language set from Android's own per-app language settings is shown as
+     * the current one while it lasts, and is replaced the next time this runs.
      */
     fun applyRequestedLanguage() {
-        val requested = requestedLanguage
-        val currentTags = AppCompatDelegate.getApplicationLocales().toLanguageTags()
-        val current = AppLanguage.forLanguageTags(currentTags)
-
-        if (currentTags.isNotEmpty() && current != requested && current != appliedLanguage) {
-            preferences.edit { putString(KEY_LANGUAGE, current.languageTag) }
-            appliedLanguage = current
-            return
-        }
-        AppCompatDelegate.setApplicationLocales(requested.locales)
-        appliedLanguage = requested
+        AppCompatDelegate.setApplicationLocales(requestedLanguage.locales)
     }
-
-    /** What the last start-up put into effect; [AppLanguage.SYSTEM] until then. */
-    private var appliedLanguage: AppLanguage
-        get() = AppLanguage.forTag(preferences.getString(KEY_APPLIED_LANGUAGE, null))
-        set(value) {
-            preferences.edit { putString(KEY_APPLIED_LANGUAGE, value.languageTag) }
-        }
 
     /** Whether the language the user asked for is the one actually on screen. */
     val languageChangeIsPending: Boolean
@@ -192,7 +173,6 @@ class Settings(context: Context) {
         internal const val FILE_NAME = "wakusei.settings"
 
         private const val KEY_LANGUAGE = "language"
-        private const val KEY_APPLIED_LANGUAGE = "appliedLanguage"
         private const val KEY_SOUND = "soundEnabled"
         private const val KEY_PRESET = "defaultTargetPreset"
         private const val KEY_CUSTOM_TARGET = "customDefaultTarget"

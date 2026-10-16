@@ -80,11 +80,11 @@
     <!-- The toolbar button that opens the settings screen (also its content description). -->
     <string name="settings_open">Settings</string>
     <string name="settings_language_title">Language</string>
-    <string name="settings_language_helper">Takes effect the next time the app starts.</string>
+    <string name="settings_language_helper">Takes effect when you leave this screen.</string>
     <!-- Shown under the list: which language is on screen, and which is waiting for a restart. -->
     <string name="settings_language_active">In use now: %1$s</string>
-    <string name="settings_language_pending">After a restart: %1$s</string>
-    <string name="msg_language_pending">The language will change the next time the app starts.</string>
+    <string name="settings_language_pending">On leaving: %1$s</string>
+    <string name="msg_language_pending">The language will change when you leave the settings screen.</string>
     <!-- "Follow the system language". The three languages below are named in their own language
          and are therefore not translated. -->
     <string name="language_system">Follow system</string>

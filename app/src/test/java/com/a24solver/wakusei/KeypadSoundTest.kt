@@ -96,27 +96,48 @@ class KeypadSoundTest {
         buffer.contentEquals(noteSamples(it, SoundEffects.KEY_NOTE_MS))
     }
 
-    /** The expected sample count of one scale: equal notes, then a longer final one. */
+    /**
+     * The expected sample count of one scale: notes one onset apart, the last one longer.
+     *
+     * The notes overlap (the onset is far shorter than a note), so the phrase length is the onset
+     * times the gaps between notes plus the final note — not a row of note-plus-silence steps.
+     */
     private fun scaleLength(pitches: List<Pitch>): Int =
-        ToneSynthesizer.samplesFor(
-            SoundEffects.SCALE_NOTE_MS + SoundEffects.SCALE_GAP_MS,
-            ToneSynthesizer.SAMPLE_RATE
-        ) * (pitches.size - 1) +
+        ToneSynthesizer.samplesFor(SoundEffects.SCALE_ONSET_MS, ToneSynthesizer.SAMPLE_RATE) *
+            (pitches.size - 1) +
             ToneSynthesizer.samplesFor(SoundEffects.SCALE_LAST_NOTE_MS, ToneSynthesizer.SAMPLE_RATE)
 
-    /** The slice of [phrase] that holds the note itself at [index] (its gap is not included). */
-    private fun noteSlice(phrase: ShortArray, pitches: List<Pitch>, index: Int): ShortArray {
-        val step = ToneSynthesizer.samplesFor(
-            SoundEffects.SCALE_NOTE_MS + SoundEffects.SCALE_GAP_MS,
-            ToneSynthesizer.SAMPLE_RATE
-        )
-        val start = index * step
-        val end = if (index == pitches.lastIndex) {
-            phrase.size
-        } else {
-            start + ToneSynthesizer.samplesFor(SoundEffects.SCALE_NOTE_MS, ToneSynthesizer.SAMPLE_RATE)
-        }
-        return phrase.copyOfRange(start, end)
+    /**
+     * Whether the phrase has a note attack at [index].
+     *
+     * Later notes are mixed with the ones still ringing, so they cannot be compared sample by
+     * sample; what can be checked is that the sound *starts* there — the level right after the onset
+     * is above the level right before it.
+     */
+    private fun hasAttackAt(phrase: ShortArray, index: Int): Boolean {
+        val onset = ToneSynthesizer.samplesFor(SoundEffects.SCALE_ONSET_MS, ToneSynthesizer.SAMPLE_RATE)
+        val at = index * onset
+        if (at + 400 >= phrase.size) return true // the long final note: its onset is the tail
+        // before the first note there is silence, not an empty window to divide by
+        val before = if (at >= 200) rms(phrase, at - 200, at) else 0.0
+        val after = rms(phrase, at + 20, at + 220)
+        return after > before
+    }
+
+    /**
+     * Whether the phrase opens on [pitch]: only the first onset window can be compared exactly,
+     * because the second note starts right after it and the two are mixed from then on.
+     */
+    private fun startsWith(phrase: ShortArray, pitch: Pitch): Boolean {
+        val window = ToneSynthesizer.samplesFor(SoundEffects.SCALE_ONSET_MS, ToneSynthesizer.SAMPLE_RATE)
+        val expected = noteSamples(pitch, SoundEffects.SCALE_NOTE_MS)
+        return phrase.copyOfRange(0, window).contentEquals(expected.copyOfRange(0, window))
+    }
+
+    private fun rms(samples: ShortArray, from: Int, to: Int): Double {
+        var sum = 0.0
+        for (index in from until to) sum += samples[index].toDouble() * samples[index]
+        return kotlin.math.sqrt(sum / (to - from))
     }
 
     private fun awaitResultScreen(timeoutMs: Long = 20_000) {
@@ -185,27 +206,22 @@ class KeypadSoundTest {
     }
 
     @Test
-    fun solvePlaysItsScaleWithALongFinalNote() {
+    fun solvePlaysItsScaleNotesOneOnsetApartWithALongFinalNote() {
         click(R.id.button_solve)
 
         val phrase = sink.played.single()
         assertEquals(scaleLength(Melodies.SOLVE_SCALE), phrase.size)
-        Melodies.SOLVE_SCALE.forEachIndexed { index, pitch ->
-            val durationMs = if (index == Melodies.SOLVE_SCALE.lastIndex) {
-                SoundEffects.SCALE_LAST_NOTE_MS
-            } else {
-                SoundEffects.SCALE_NOTE_MS
-            }
-            assertTrue(
-                "SOLVE note $index should be ${pitch.noteName}",
-                noteSlice(phrase, Melodies.SOLVE_SCALE, index)
-                    .contentEquals(noteSamples(pitch, durationMs))
-            )
+        assertTrue(
+            "SOLVE should open on ${Melodies.SOLVE_SCALE.first().noteName}",
+            startsWith(phrase, Melodies.SOLVE_SCALE.first())
+        )
+        Melodies.SOLVE_SCALE.indices.forEach { index ->
+            assertTrue("SOLVE should have a note attack at position $index", hasAttackAt(phrase, index))
         }
     }
 
     @Test
-    fun aLongPressOnClearAndDelPlaysItsArpeggioWithALongFinalNote() {
+    fun aLongPressOnClearAndDelPlaysItsArpeggio() {
         for (id in listOf(R.id.button_clear, R.id.button_del)) {
             sink.played.clear()
             longClick(id)
@@ -214,20 +230,14 @@ class KeypadSoundTest {
             assertEquals("long press on $id", scaleLength(Melodies.RESET_SCALE), phrase.size)
             assertTrue(
                 "the arpeggio should start on ${Melodies.RESET_SCALE.first().noteName}",
-                noteSlice(phrase, Melodies.RESET_SCALE, 0).contentEquals(
-                    noteSamples(Melodies.RESET_SCALE.first(), SoundEffects.SCALE_NOTE_MS)
+                startsWith(phrase, Melodies.RESET_SCALE.first())
+            )
+            Melodies.RESET_SCALE.indices.forEach { index ->
+                assertTrue(
+                    "the arpeggio should have a note attack at position $index",
+                    hasAttackAt(phrase, index)
                 )
-            )
-            assertTrue(
-                "the last note should be the long one",
-                noteSlice(phrase, Melodies.RESET_SCALE, Melodies.RESET_SCALE.lastIndex)
-                    .contentEquals(
-                        noteSamples(
-                            Melodies.RESET_SCALE.last(),
-                            SoundEffects.SCALE_LAST_NOTE_MS
-                        )
-                    )
-            )
+            }
         }
     }
 

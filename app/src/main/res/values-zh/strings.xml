@@ -51,10 +51,10 @@
     <!-- Settings -->
     <string name="settings_open">设置</string>
     <string name="settings_language_title">语言</string>
-    <string name="settings_language_helper">下次启动应用时生效。</string>
+    <string name="settings_language_helper">离开本页时生效。</string>
     <string name="settings_language_active">当前使用：%1$s</string>
-    <string name="settings_language_pending">重启后：%1$s</string>
-    <string name="msg_language_pending">语言将在下次启动应用时生效。</string>
+    <string name="settings_language_pending">离开本页后：%1$s</string>
+    <string name="msg_language_pending">离开设置页后将切换到该语言。</string>
     <string name="language_system">跟随系统</string>
 
     <string name="settings_default_target_title">默认目标数</string>

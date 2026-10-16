@@ -11,18 +11,18 @@ class ToneEngineTest {
     private val sampleRate = ToneSynthesizer.SAMPLE_RATE
 
     /** What the sink was handed, in order. */
-    private fun phrase(noteMs: Int = 40, gapMs: Int = 0, lastNoteMs: Int = noteMs) =
-        Phrase(Melodies.SOLVE_SCALE, noteMs, gapMs, lastNoteMs)
+    private fun phrase(noteMs: Int = 40, onsetMs: Int = 40, lastNoteMs: Int = noteMs) =
+        Phrase(Melodies.SOLVE_SCALE, noteMs, onsetMs, lastNoteMs)
 
     @Test
     fun aPhraseReachesTheSinkAsOneBuffer() {
         val sink = RecordingSink()
         val engine = ToneEngine(sink, sampleRate, directExecutor)
 
-        engine.play(phrase(noteMs = 40, gapMs = 10))
+        engine.play(phrase(noteMs = 40, onsetMs = 10))
 
         assertEquals(1, sink.played.size)
-        val expected = ToneSynthesizer.samplesFor(50, sampleRate) * (Melodies.SOLVE_SCALE.size - 1) +
+        val expected = ToneSynthesizer.samplesFor(10, sampleRate) * (Melodies.SOLVE_SCALE.size - 1) +
             ToneSynthesizer.samplesFor(40, sampleRate)
         assertEquals(expected, sink.sampleCounts.single())
     }
@@ -65,7 +65,7 @@ class ToneEngineTest {
         val engine = ToneEngine(sink, sampleRate)
 
         val start = System.nanoTime()
-        engine.play(phrase(noteMs = 200, gapMs = 80, lastNoteMs = 1_200))
+        engine.play(phrase(noteMs = 200, onsetMs = 80, lastNoteMs = 1_200))
         val elapsedMs = (System.nanoTime() - start) / 1_000_000
 
         assertTrue(

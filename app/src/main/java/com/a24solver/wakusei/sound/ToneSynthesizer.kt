@@ -72,30 +72,47 @@ object ToneSynthesizer {
         ShortArray(samplesFor(durationMs, sampleRate))
 
     /**
-     * [pitches] played one after another, each `noteMs` long with `gapMs` of silence behind it,
-     * except the last one, which lasts [lastNoteMs] — a longer final note lets a scale ring out
-     * instead of stopping dead, and reads as a full stop. There is no silence after the last note:
-     * the voice ends when the sound does.
+     * [pitches] played one after another, **[onsetMs] apart**, as a single buffer.
+     *
+     * `onsetMs` is the distance between one note's attack and the next one's — *not* a stretch of
+     * silence. Since a note rings for longer than that, consecutive notes overlap and the phrase
+     * becomes a rolled chord rather than a row of separate blips: that is what makes a scale sound
+     * like an ensemble instead of a stutter. The overlap is mixed here, in the buffer, and passed
+     * through [SoftLimiter], so a dense moment is compressed rather than clipped.
+     *
+     * The last note lasts [lastNoteMs] — longer, so the phrase ends on a note that rings on — and the
+     * buffer ends when that note does.
      */
     fun phrase(
         pitches: List<Pitch>,
         noteMs: Int,
-        gapMs: Int,
+        onsetMs: Int,
         lastNoteMs: Int = noteMs,
         sampleRate: Int = SAMPLE_RATE
     ): ShortArray {
         require(pitches.isNotEmpty()) { "A phrase needs at least one note" }
-        require(noteMs > 0 && gapMs >= 0 && lastNoteMs > 0) {
-            "A phrase needs positive note lengths"
+        require(noteMs > 0 && onsetMs > 0 && lastNoteMs > 0) {
+            "A phrase needs positive note lengths and spacing"
         }
-        val step = samplesFor(noteMs + gapMs, sampleRate)
-        val last = samplesFor(lastNoteMs, sampleRate)
-        val out = ShortArray(step * (pitches.size - 1) + last)
+
+        fun durationOf(index: Int) = if (index == pitches.lastIndex) lastNoteMs else noteMs
+
+        val onsetSamples = samplesFor(onsetMs, sampleRate)
+        val total = pitches.indices.maxOf { index ->
+            index * onsetSamples + samplesFor(durationOf(index), sampleRate)
+        }
+
+        // summed in 16-bit units, so anything inside the limiter's knee comes back out unchanged
+        val mixed = IntArray(total)
         pitches.forEachIndexed { index, pitch ->
-            val durationMs = if (index == pitches.lastIndex) lastNoteMs else noteMs
-            note(pitch, durationMs, sampleRate).copyInto(out, index * step)
+            val note = note(pitch, durationOf(index), sampleRate)
+            val offset = index * onsetSamples
+            for (sample in note.indices) {
+                mixed[offset + sample] += note[sample].toInt()
+            }
         }
-        return out
+
+        return ShortArray(total) { index -> SoftLimiter.limitSample(mixed[index]) }
     }
 
     /** Fades the first few milliseconds in and the last few out, so notes never click. */

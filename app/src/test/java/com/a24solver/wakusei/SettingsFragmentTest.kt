@@ -108,7 +108,7 @@ class SettingsFragmentTest {
     // -------------------------------------------------------------- language
 
     @Test
-    fun choosingALanguageIsRecordedButWaitsForTheNextStart() {
+    fun choosingALanguageIsRecordedButAppliesOnlyWhenLeaving() {
         openSettings()
 
         selectLanguage(AppLanguage.JAPANESE.ordinal)
@@ -126,9 +126,42 @@ class SettingsFragmentTest {
             status().contains("Follow system") && status().contains("日本語")
         )
         assertTrue(
-            "the user should be told it takes effect at the next start",
-            ShadowToast.getTextOfLatestToast().contains("next time the app starts")
+            "the user should be told it applies when the screen is left, was " +
+                "'${ShadowToast.getTextOfLatestToast()}'",
+            ShadowToast.getTextOfLatestToast().contains("leave the settings screen")
         )
+    }
+
+    @Test
+    fun leavingTheSettingsScreenAppliesTheChosenLanguage() {
+        openSettings()
+        selectLanguage(AppLanguage.JAPANESE.ordinal)
+        assertEquals("", AppCompatDelegate.getApplicationLocales().toLanguageTags())
+
+        leaveSettings()
+
+        assertTrue(
+            "leaving the screen should switch the language, was " +
+                "${AppCompatDelegate.getApplicationLocales()}",
+            AppCompatDelegate.getApplicationLocales().toLanguageTags().startsWith("ja")
+        )
+        assertFalse(settings().languageChangeIsPending)
+    }
+
+    @Test
+    fun aRotationIsNotLeavingTheSettingsScreen() {
+        // the rule on its own: a rotation also destroys the view, but must not switch languages
+        assertFalse(LanguageApplyRule.shouldApply(isChangingConfigurations = true, isPending = true))
+        assertTrue(LanguageApplyRule.shouldApply(isChangingConfigurations = false, isPending = true))
+        assertFalse(LanguageApplyRule.shouldApply(isChangingConfigurations = false, isPending = false))
+    }
+
+    private fun leaveSettings() {
+        val navHost = controller.get().supportFragmentManager
+            .findFragmentById(R.id.nav_host_fragment_content_main) as NavHostFragment
+        navHost.navController.navigateUp()
+        controller.get().supportFragmentManager.executePendingTransactions()
+        shadowOf(Looper.getMainLooper()).idle()
     }
 
     @Test

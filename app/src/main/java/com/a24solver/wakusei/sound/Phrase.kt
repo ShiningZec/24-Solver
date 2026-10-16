@@ -1,15 +1,17 @@
 package com.a24solver.wakusei.sound
 
 /**
- * A phrase of notes: what to play, how long each note lasts, and how much silence sits between them.
+ * A phrase of notes: what to play, how long each note lasts, and how far apart their attacks are.
  *
- * The last note gets its own length ([lastNoteMs]) so a scale can end on a long, ringing note; a
- * single keypad tone is simply a phrase of one note, where the two lengths are the same.
+ * [onsetMs] is the distance between consecutive *onsets*, not silence between notes: a note that
+ * rings longer than that overlaps the next one, which is what a rolled chord is. The last note gets
+ * its own length ([lastNoteMs]) so a scale can end on a note that rings on; a single keypad tone is
+ * simply a phrase of one note, where the two lengths are the same.
  */
 data class Phrase(
     val pitches: List<Pitch>,
     val noteMs: Int,
-    val gapMs: Int = 0,
+    val onsetMs: Int = noteMs,
     val lastNoteMs: Int = noteMs
 ) {
     init {
@@ -36,7 +38,7 @@ class PhraseCache(
         ToneSynthesizer.phrase(
             phrase.pitches,
             phrase.noteMs,
-            phrase.gapMs,
+            phrase.onsetMs,
             phrase.lastNoteMs,
             sampleRate
         )

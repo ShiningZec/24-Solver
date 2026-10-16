@@ -52,11 +52,11 @@ class PhraseCacheTest {
 
     @Test
     fun aPhraseIsOnlyTheSameIfEveryPartMatches() {
-        val base = Phrase(listOf(Pitch.C4, Pitch.E4), noteMs = 100, gapMs = 20, lastNoteMs = 300)
+        val base = Phrase(listOf(Pitch.C4, Pitch.E4), noteMs = 100, onsetMs = 20, lastNoteMs = 300)
 
         assertEquals(base, Phrase(listOf(Pitch.C4, Pitch.E4), 100, 20, 300))
         assertTrue(base != base.copy(noteMs = 101))
-        assertTrue(base != base.copy(gapMs = 21))
+        assertTrue(base != base.copy(onsetMs = 21))
         assertTrue(base != base.copy(lastNoteMs = 301))
         assertTrue(base != base.copy(pitches = listOf(Pitch.C4, Pitch.F4)))
     }
@@ -86,9 +86,9 @@ class PhraseCacheTest {
     fun theRealRendererProducesAUsablePhrase() {
         val cache = PhraseCache()
 
-        val samples = cache.samples(Phrase(Melodies.SOLVE_SCALE, noteMs = 40, gapMs = 5, lastNoteMs = 80))
+        val samples = cache.samples(Phrase(Melodies.SOLVE_SCALE, noteMs = 40, onsetMs = 5, lastNoteMs = 80))
 
-        val expected = ToneSynthesizer.samplesFor(45, ToneSynthesizer.SAMPLE_RATE) *
+        val expected = ToneSynthesizer.samplesFor(5, ToneSynthesizer.SAMPLE_RATE) *
             (Melodies.SOLVE_SCALE.size - 1) +
             ToneSynthesizer.samplesFor(80, ToneSynthesizer.SAMPLE_RATE)
         assertEquals(expected, samples.size)

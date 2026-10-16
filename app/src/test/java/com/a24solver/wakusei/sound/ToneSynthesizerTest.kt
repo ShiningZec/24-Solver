@@ -127,42 +127,82 @@ class ToneSynthesizerTest {
     }
 
     @Test
-    fun aPhraseIsTheNotesLaidEndToEnd() {
+    fun aPhraseStartsItsNotesOneOnsetApart() {
         val noteMs = 50
-        val gapMs = 20
+        val onsetMs = 120
         val pitches = listOf(Pitch.C4, Pitch.E4, Pitch.G4)
-        val phrase = ToneSynthesizer.phrase(pitches, noteMs, gapMs, sampleRate = sampleRate)
 
-        val step = ToneSynthesizer.samplesFor(noteMs + gapMs, sampleRate)
-        assertEquals("no silence should follow the last note", step * 2 + ToneSynthesizer.samplesFor(noteMs, sampleRate), phrase.size)
+        val phrase = ToneSynthesizer.phrase(pitches, noteMs, onsetMs, sampleRate = sampleRate)
 
-        // each slice sounds exactly like the single note it was built from ...
-        pitches.forEachIndexed { index, pitch ->
-            val offset = index * step
-            val expected = ToneSynthesizer.note(pitch, noteMs, sampleRate)
-            assertTrue(
-                "slice $index does not match ${pitch.noteName}",
-                expected.indices.all { phrase[offset + it] == expected[it] }
-            )
-        }
-        // ... and the gaps really are silent
-        val gapStart = ToneSynthesizer.samplesFor(noteMs, sampleRate)
-        assertTrue((gapStart until step).all { phrase[it] == 0.toShort() })
+        val onset = ToneSynthesizer.samplesFor(onsetMs, sampleRate)
+        assertEquals(
+            "the phrase ends when the last note does",
+            onset * (pitches.size - 1) + ToneSynthesizer.samplesFor(noteMs, sampleRate),
+            phrase.size
+        )
+        // nothing overlaps yet in the first onset, so it is the first note exactly
+        assertTrue(
+            "the first note should start the phrase unchanged",
+            phrase.copyOfRange(0, ToneSynthesizer.samplesFor(noteMs, sampleRate))
+                .contentEquals(ToneSynthesizer.note(pitches.first(), noteMs, sampleRate))
+        )
+    }
+
+    @Test
+    fun overlappingNotesAreMixedAndStayInsideTheSampleRange() {
+        val pitches = Melodies.SOLVE_SCALE
+        val phrase = ToneSynthesizer.phrase(
+            pitches,
+            noteMs = 450,
+            onsetMs = 120,
+            lastNoteMs = 1_200,
+            sampleRate = sampleRate
+        )
+
+        val peak = phrase.maxOf { abs(it.toInt()) }
+        assertTrue("the mix clipped at $peak", peak <= Short.MAX_VALUE)
+        assertTrue("the mix went silent", peak > Short.MAX_VALUE / 2)
+
+        // where notes overlap the output is the sum, not one note: the region between the first and
+        // second attacks has to be louder than the tail of the first note alone
+        val onset = ToneSynthesizer.samplesFor(120, sampleRate)
+        val firstNote = ToneSynthesizer.note(pitches.first(), 450, sampleRate)
+        val mixedWindow = phrase.copyOfRange(onset + 100, onset + 400)
+        val aloneWindow = firstNote.copyOfRange(onset + 100, onset + 400)
+        assertTrue(
+            "the second note's attack is missing from the mix",
+            mixedWindow.maxOf { abs(it.toInt()) } > aloneWindow.maxOf { abs(it.toInt()) }
+        )
     }
 
     @Test
     fun aPhraseCanEndOnALongerNote() {
         val pitches = listOf(Pitch.C4, Pitch.E4, Pitch.G4)
         val lastNoteMs = 400
+        val onsetMs = 60
 
-        val phrase = ToneSynthesizer.phrase(pitches, noteMs = 50, gapMs = 20, lastNoteMs = lastNoteMs, sampleRate = sampleRate)
+        val phrase = ToneSynthesizer.phrase(pitches, noteMs = 50, onsetMs = onsetMs, lastNoteMs = lastNoteMs, sampleRate = sampleRate)
 
-        val step = ToneSynthesizer.samplesFor(70, sampleRate)
-        assertEquals(step * 2 + ToneSynthesizer.samplesFor(lastNoteMs, sampleRate), phrase.size)
-        // the final note is the long one, and it is the note it should be
-        val finalSlice = phrase.copyOfRange(step * 2, phrase.size)
-        assertTrue(finalSlice.contentEquals(ToneSynthesizer.note(Pitch.G4, lastNoteMs, sampleRate)))
-        assertTrue("the last note should be much longer", finalSlice.size > step * 2)
+        val onset = ToneSynthesizer.samplesFor(onsetMs, sampleRate)
+        assertEquals(onset * 2 + ToneSynthesizer.samplesFor(lastNoteMs, sampleRate), phrase.size)
+        // the tail belongs to the last note, which is still ringing on its own by then
+        val tailStart = phrase.size - 200
+        assertEquals(
+            "the long final note should be ringing at the end",
+            true,
+            phrase.copyOfRange(tailStart, phrase.size).any { it != 0.toShort() }
+        )
+    }
+
+    @Test
+    fun aSingleNotePhraseIsExactlyThatNote() {
+        // the keypad tone must not be changed by any of the mixing machinery
+        val phrase = ToneSynthesizer.phrase(listOf(Pitch.A4), noteMs = 300, onsetMs = 300, sampleRate = sampleRate)
+
+        assertTrue(
+            "a one-note phrase should be bit-for-bit the note itself",
+            phrase.contentEquals(ToneSynthesizer.note(Pitch.A4, 300, sampleRate))
+        )
     }
 
     @Test
@@ -171,7 +211,10 @@ class ToneSynthesizerTest {
             ToneSynthesizer.phrase(emptyList(), 100, 10, sampleRate = sampleRate)
         }
         assertThrows(IllegalArgumentException::class.java) {
-            ToneSynthesizer.phrase(listOf(Pitch.C4), noteMs = 0, gapMs = 0, sampleRate = sampleRate)
+            ToneSynthesizer.phrase(listOf(Pitch.C4), noteMs = 0, onsetMs = 0, sampleRate = sampleRate)
+        }
+        assertThrows(IllegalArgumentException::class.java) {
+            ToneSynthesizer.phrase(listOf(Pitch.C4, Pitch.D4), noteMs = 100, onsetMs = 0, sampleRate = sampleRate)
         }
         assertThrows(IllegalArgumentException::class.java) {
             ToneSynthesizer.note(Pitch.C4, 0, sampleRate)

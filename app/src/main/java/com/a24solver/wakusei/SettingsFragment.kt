@@ -208,5 +208,29 @@ class SettingsFragment : Fragment() {
     override fun onDestroyView() {
         super.onDestroyView()
         _binding = null
+
+        // Leaving this screen is when the language choice takes effect — the screen the user is
+        // standing on is the one that must not be rebuilt under their finger.
+        if (LanguageApplyRule.shouldApply(
+                isChangingConfigurations = requireActivity().isChangingConfigurations,
+                isPending = settings.languageChangeIsPending
+            )
+        ) {
+            settings.applyRequestedLanguage()
+        }
     }
+}
+
+/**
+ * When a language choice is put into effect.
+ *
+ * Separated out because the interesting part is a single exception: a configuration change also
+ * destroys this screen's view, and a rotation is not the user leaving — switching the language there
+ * would rebuild the screen mid-rotation, which is exactly the surprise the deferred switch exists to
+ * avoid.
+ */
+internal object LanguageApplyRule {
+
+    fun shouldApply(isChangingConfigurations: Boolean, isPending: Boolean): Boolean =
+        isPending && !isChangingConfigurations
 }

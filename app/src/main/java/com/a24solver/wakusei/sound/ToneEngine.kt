@@ -46,9 +46,18 @@ class ToneEngine(
         }
     }
 
-    /** Convenience for the common "one note" and "a scale with a long final note" cases. */
-    fun play(pitches: List<Pitch>, noteMs: Int, gapMs: Int, lastNoteMs: Int = noteMs): Unit =
-        play(Phrase(pitches.toList(), noteMs, gapMs, lastNoteMs))
+    /**
+     * Convenience for the common "one note" and "a scale with a long final note" cases.
+     *
+     * [onsetMs] is the distance between consecutive note attacks; see [Phrase]. It defaults to the
+     * note length, which is the only sensible value for a single note.
+     */
+    fun play(
+        pitches: List<Pitch>,
+        noteMs: Int,
+        onsetMs: Int = noteMs,
+        lastNoteMs: Int = noteMs
+    ): Unit = play(Phrase(pitches.toList(), noteMs, onsetMs, lastNoteMs))
 
     fun shutdown() {
         (executor as? ExecutorService)?.shutdownNow()

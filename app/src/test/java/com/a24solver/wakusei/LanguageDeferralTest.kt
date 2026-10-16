@@ -20,12 +20,12 @@ import org.robolectric.android.controller.ActivityController
 import org.robolectric.annotation.Config
 
 /**
- * The language change is deliberately *not* applied when it is chosen: it waits for the next start
- * of the app.
+ * The language change is deliberately *not* applied the moment it is chosen: the settings screen only
+ * records it, and it takes effect when that screen is left (plus once at start-up, so a choice made
+ * before the process died is not lost).
  *
- * What that means in practice is checked here — picking a language leaves the running app alone,
- * the recorded choice survives, and the application putting it into effect at start-up is what
- * actually switches it.
+ * What that means in practice is checked here — picking a language leaves the running app alone, the
+ * recorded choice survives, and applying it is what switches it.
  */
 @RunWith(RobolectricTestRunner::class)
 @Config(sdk = [34])
@@ -98,7 +98,7 @@ class LanguageDeferralTest {
     fun theNextStartPutsTheRequestedLanguageIntoEffect() {
         settings().requestLanguage(AppLanguage.CHINESE)
 
-        // what WakuseiApplication does on the next launch
+        // what WakuseiApplication does on the next launch, and what leaving the settings screen does
         settings().applyRequestedLanguage()
 
         assertTrue("expected zh, was ${activeTags()}", activeTags().startsWith("zh"))
@@ -120,19 +120,16 @@ class LanguageDeferralTest {
     }
 
     @Test
-    fun aLanguageChosenInTheSystemSettingsIsAdoptedRatherThanOverridden() {
-        // Android's per-app language settings changed it behind the app's back
+    fun theInAppChoiceIsWhatIsApplied() {
+        // the language may also be set from Android's own per-app language settings; the choice made
+        // in the app is the newest thing the user said about it, so it is the one that wins
         AppCompatDelegate.setApplicationLocales(LocaleListCompat.forLanguageTags("ja"))
-        settings().requestLanguage(AppLanguage.CHINESE) // the stale, older request
+        settings().requestLanguage(AppLanguage.CHINESE)
 
         settings().applyRequestedLanguage()
 
-        assertTrue("the system's choice should win, was ${activeTags()}", activeTags().startsWith("ja"))
-        assertEquals(
-            "and it should become the recorded request",
-            AppLanguage.JAPANESE,
-            settings().requestedLanguage
-        )
+        assertTrue("expected zh, was ${activeTags()}", activeTags().startsWith("zh"))
+        assertEquals(AppLanguage.CHINESE, settings().requestedLanguage)
     }
 
     // ------------------------------------------------- the application really does it
