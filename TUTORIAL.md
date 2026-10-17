@@ -1,7 +1,7 @@
 # 24 Solver — Quick Tutorial
 
 24 Solver finds **every** way to reach a target number (24 by default) from the numbers you type.
-Each number is used exactly once, with `+ - × ÷` and any bracketing, and every solution is listed.
+Each number is used exactly once, with $+\ -\ \times\ \div$ and any bracketing, and every solution is listed.
 It also groups the answers, so you can see how many *genuinely different* solutions there are, plays
 a note for every key you press, and speaks English, Chinese and Japanese.
 
