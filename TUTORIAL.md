@@ -49,9 +49,12 @@ Tap `TARGET`. The key stays lit and the keypad now types the target instead of n
 - `CLEAR` **tap** — clears only what the current mode owns, and says nothing: with `TARGET` off it
   empties `NUMBERS`, with `TARGET` lit it puts the target back to 24.
 - `CLEAR` **long press (about half a second)** — the "start over" gesture: numbers and target both
-  return to the defaults, with a light tick and a short *All Numbers Set to Default* message.
-- `DEL` **long press (about half a second)** — drops the last number in `NUMBERS` (handy when only
-  the fifth number was mistyped). You feel a tick when a number was actually removed.
+  return to the defaults, with a light tick and a short *Target and/or Numbers are Set to Default*
+  message.
+- `DEL` **long press (about half a second)** — in three steps, so it is never destructive by surprise:
+  ① if something is typed, it empties the input; ② if nothing is typed, it takes back the last number
+  in `NUMBERS`; ③ if there is nothing at all, it does nothing — no message, no tick. You feel a tick
+  in cases ① and ②.
 
 ## Solving
 
@@ -87,15 +90,18 @@ are no recorded samples anywhere in it.
 
 | press | you hear |
 | --- | --- |
-| any of the fifteen keys `0-9`, `+/-`, `NEXT`, `CLEAR`, `DEL`, `TARGET` | one note, drawn from C, D, E, F#, G, A, Bb and high C |
-| `SOLVE` | the six-note scale C, Eb, F#, G, Bb, B |
-| a long press on `CLEAR` or `DEL` | the three-note arpeggio E, G#, high C |
+| any of the fifteen keys `0-9`, `+/-`, `NEXT`, `CLEAR`, `DEL`, `TARGET` | one note, drawn from the current set of notes |
+| `SOLVE` | the current scale, rolled out 120 ms apart and ringing into itself, with a long last note |
+| a long press on `CLEAR` or `DEL` | the current arpeggio, rolled the same way |
 | anything on the answers screen | nothing |
 
-The fifteen keys share one shuffled bag of those eight notes: you hear each of them once before any
-one comes round again, and the bag is re-shuffled every time it runs out — so tapping a few keys
-gives you a melody rather than the same note over and over. The sound never holds up the keypress:
-it is played on a background thread and goes to the media volume, so it follows the volume keys.
+The notes themselves live in one place (`sound/Melodies.kt`), so the instrument is a matter of taste
+rather than of code: the scale, the arpeggio and the set the keys draw from are three lists. The
+fifteen keys share one shuffled bag, so you hear each note once before any comes round again, and the
+bag is re-shuffled every time it runs out — tapping a few keys gives you a melody rather than the same
+note over and over. Notes are six-voice polyphonic: they ring into each other instead of cutting each
+other off. The sound never holds up the keypress: it is played on a background thread and goes to the
+media volume, so it follows the volume keys.
 
 If you would rather not have it, turn **Keypad sound** off in the settings.
 
@@ -106,9 +112,10 @@ screen. The back arrow brings you back to wherever you came from.
 
 | setting | what it does |
 | --- | --- |
-| **Language** | Follow system, 中文, English or 日本語. The change is immediate, and your choice is remembered. |
+| **Language** | Follow system, 中文, English or 日本語. It takes effect when you leave the settings screen (a rotation is not leaving), and your choice is remembered. |
 | **Default target** | The target a fresh screen starts on and the one a long press on `CLEAR` returns to. |
 | **Keypad sound** | Turns every keypad sound on or off. |
+| **Help** | Opens this guide's in-app version — the same help page that appears once, on the first start. |
 
 The default target is set with a slider whose stops are `CUSTOMIZE`, `-24`, `-10`, `0`, `10`, `24`
 and `60` — two of them negative, so you can see straight away that a target may be negative. Pick

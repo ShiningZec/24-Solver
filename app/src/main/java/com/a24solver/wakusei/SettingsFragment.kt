@@ -6,6 +6,7 @@ import android.view.View
 import android.view.ViewGroup
 import android.widget.Toast
 import androidx.fragment.app.Fragment
+import androidx.navigation.fragment.findNavController
 import androidx.core.widget.doAfterTextChanged
 import com.a24solver.wakusei.databinding.FragmentSettingsBinding
 import com.a24solver.wakusei.settings.AppLanguage
@@ -48,7 +49,18 @@ class SettingsFragment : Fragment() {
         setUpLanguage()
         setUpDefaultTarget()
         setUpSound()
+        setUpHelp()
         render()
+    }
+
+    /**
+     * The help page is opened automatically once, on the first start; this is where it can be found
+     * afterwards. It is pushed on top of the settings screen, so the up arrow comes back here.
+     */
+    private fun setUpHelp() {
+        binding.buttonHelp.setOnClickListener {
+            findNavController().navigate(R.id.HelpFragment)
+        }
     }
 
     // -------------------------------------------------------------- language

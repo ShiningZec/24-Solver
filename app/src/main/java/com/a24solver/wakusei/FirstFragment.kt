@@ -498,6 +498,30 @@ class FirstFragment : Fragment() {
             target = settings.defaultTarget
         }
         refreshDisplay()
+        offerHelpOnFirstStart(savedInstanceState)
+    }
+
+    /**
+     * Opens the help page by itself on the very first start, and only then.
+     *
+     * [savedInstanceState] is part of the condition because this screen is also rebuilt for a
+     * rotation: the flag alone would usually be enough (it is stored before the page opens), but a
+     * restore that happened in between must never push a second copy of the page on top.
+     *
+     * The navigation is posted instead of called here: this runs inside the fragment's own view
+     * creation, and pushing a destination from there races with the transaction that is still being
+     * applied.
+     */
+    private fun offerHelpOnFirstStart(savedInstanceState: Bundle?) {
+        if (savedInstanceState != null || settings.helpShown) return
+
+        settings.helpShown = true
+        binding.root.post {
+            // the fragment may be gone by the time the post runs (a fast back press, a test teardown)
+            if (isAdded && view != null) {
+                runCatching { findNavController().navigate(R.id.HelpFragment) }
+            }
+        }
     }
 
     /**

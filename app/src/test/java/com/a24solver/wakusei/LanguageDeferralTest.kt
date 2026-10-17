@@ -43,6 +43,7 @@ class LanguageDeferralTest {
     @Before
     fun setUp() {
         clearSettings()
+        markHelpSeen(context)
         AppCompatDelegate.setApplicationLocales(LocaleListCompat.getEmptyLocaleList())
         controller = Robolectric.buildActivity(MainActivity::class.java).setup()
     }

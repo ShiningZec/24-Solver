@@ -59,6 +59,7 @@ class KeypadSoundTest {
         SoundEffects.useEngine(ToneEngine(sink, ToneSynthesizer.SAMPLE_RATE, directExecutor))
         SoundEffects.resetNoteQueue()
         settings().soundEnabled = true
+        markHelpSeen(RuntimeEnvironment.getApplication())
 
         controller = Robolectric.buildActivity(MainActivity::class.java).setup()
         val fm = controller.get().supportFragmentManager

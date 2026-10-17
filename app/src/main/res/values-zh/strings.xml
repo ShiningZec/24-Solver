@@ -67,4 +67,8 @@
 
     <string name="settings_sound_title">按键音效</string>
     <string name="settings_sound_helper">按下键盘按键时播放音效。关闭后键盘、求解与长按手势都会静音。</string>
+    <!-- Help page: the text itself lives in docs/help/*.md and is bundled as an asset. -->
+    <string name="help_title">帮助</string>
+    <string name="settings_help">打开帮助页面</string>
+    <string name="help_unavailable">帮助文本加载失败。</string>
 </resources>

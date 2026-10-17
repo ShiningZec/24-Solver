@@ -52,6 +52,7 @@ class DefaultTargetTest {
     private fun settings() = Settings(RuntimeEnvironment.getApplication())
 
     private fun start() {
+        markHelpSeen(RuntimeEnvironment.getApplication())
         controller = Robolectric.buildActivity(MainActivity::class.java).setup()
         val fm = controller.get().supportFragmentManager
         fm.executePendingTransactions()

@@ -65,6 +65,7 @@ class SettingsFragmentTest {
 
     /** Opens the settings screen through the navigation graph, the way the toolbar button does. */
     private fun openSettings() {
+        markHelpSeen(RuntimeEnvironment.getApplication())
         controller = Robolectric.buildActivity(MainActivity::class.java).setup()
         val fm = controller.get().supportFragmentManager
         fm.executePendingTransactions()

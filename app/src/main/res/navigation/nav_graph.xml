@@ -33,4 +33,12 @@
         android:name="com.a24solver.wakusei.SettingsFragment"
         android:label="@string/settings_fragment_label"
         tools:layout="@layout/fragment_settings" />
+
+    <!-- Opened automatically on the first start (see FirstFragment) and afterwards from the
+         settings screen; a sibling as well, so the up arrow always goes back where it came from. -->
+    <fragment
+        android:id="@+id/HelpFragment"
+        android:name="com.a24solver.wakusei.HelpFragment"
+        android:label="@string/help_title"
+        tools:layout="@layout/fragment_help" />
 </navigation>

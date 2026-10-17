@@ -79,8 +79,8 @@ enum class DefaultTargetPreset(val presetValue: Int?) {
 /**
  * The app's settings, backed by `SharedPreferences`.
  *
- * Only three things live here, and all three are read where they are used rather than cached: the
- * language, the default target, and whether the keypad makes a sound.
+ * Everything here is read where it is used rather than cached: the language, the default target,
+ * whether the keypad makes a sound, and whether the help page has already introduced itself.
  */
 class Settings(context: Context) {
 
@@ -142,6 +142,19 @@ class Settings(context: Context) {
             preferences.edit { putBoolean(KEY_SOUND, value) }
         }
 
+    /**
+     * Whether the help page has already been shown on its own. It is opened automatically once, on
+     * the very first start, and never again — afterwards it is one tap away in the settings screen.
+     *
+     * The flag is stored when the page is opened rather than when it is closed, so a start that goes
+     * wrong cannot turn into a loop where the help page is forced on every launch.
+     */
+    var helpShown: Boolean
+        get() = preferences.getBoolean(KEY_HELP_SHOWN, false)
+        set(value) {
+            preferences.edit { putBoolean(KEY_HELP_SHOWN, value) }
+        }
+
     /** Which slider node is selected. */
     var defaultTargetPreset: DefaultTargetPreset
         get() = DefaultTargetPreset.forIndex(preferences.getInt(KEY_PRESET, DEFAULT_PRESET_INDEX))
@@ -174,6 +187,7 @@ class Settings(context: Context) {
 
         private const val KEY_LANGUAGE = "language"
         private const val KEY_SOUND = "soundEnabled"
+        private const val KEY_HELP_SHOWN = "helpShown"
         private const val KEY_PRESET = "defaultTargetPreset"
         private const val KEY_CUSTOM_TARGET = "customDefaultTarget"
 

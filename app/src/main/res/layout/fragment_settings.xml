@@ -103,5 +103,14 @@
             android:layout_height="wrap_content"
             android:text="@string/settings_sound_helper"
             android:textAppearance="?attr/textAppearanceBodySmall" />
+
+        <!-- == help -->
+        <com.google.android.material.button.MaterialButton
+            android:id="@+id/button_help"
+            style="@style/Widget.Material3.Button.OutlinedButton"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="24dp"
+            android:text="@string/settings_help" />
     </LinearLayout>
 </ScrollView>

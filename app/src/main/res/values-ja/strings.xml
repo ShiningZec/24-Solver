@@ -67,4 +67,8 @@
 
     <string name="settings_sound_title">キーパッドの音</string>
     <string name="settings_sound_helper">キーを押すと音が鳴ります。オフにするとキーパッド・計算・長押しの音がすべて消えます。</string>
+    <!-- Help page: the text itself lives in docs/help/*.md and is bundled as an asset. -->
+    <string name="help_title">ヘルプ</string>
+    <string name="settings_help">ヘルプページを開く</string>
+    <string name="help_unavailable">ヘルプのテキストを読み込めませんでした。</string>
 </resources>

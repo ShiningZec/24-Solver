@@ -28,6 +28,16 @@
         <item name="autoSizeStepGranularity">1sp</item>
     </style>
 
+    <!-- The help page is a document: the title carries the hierarchy, the body carries the text, and
+         both scale with the user's system font size (sp, not dp). -->
+    <style name="TextAppearance.App.HelpTitle" parent="TextAppearance.Material3.HeadlineSmall">
+        <item name="android:textStyle">bold</item>
+    </style>
+
+    <style name="TextAppearance.App.HelpBody" parent="TextAppearance.Material3.BodyLarge">
+        <item name="android:lineSpacingMultiplier">1.25</item>
+    </style>
+
     <!-- The five "special" keys ([+/-] [NEXT] [CLEAR] [TARGET] [DEL]) additionally carry the
          rose background. -->
     <style name="Widget.App.KeypadButton.Special" parent="Widget.App.KeypadButton">

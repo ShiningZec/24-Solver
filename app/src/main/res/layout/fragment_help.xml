@@ -1,0 +1,17 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- The help page: a document, so it scrolls. The blocks are added by HelpFragment from the
+     Markdown that the build bundles out of docs/help — there is deliberately no text here. -->
+<ScrollView xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:tools="http://schemas.android.com/tools"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:fillViewport="true"
+    tools:context=".HelpFragment">
+
+    <LinearLayout
+        android:id="@+id/help_content"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:orientation="vertical"
+        android:padding="16dp" />
+</ScrollView>

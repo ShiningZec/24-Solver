@@ -97,4 +97,8 @@
 
     <string name="settings_sound_title">Keypad sound</string>
     <string name="settings_sound_helper">Plays a note when a keypad key is pressed. Off silences the keypad, SOLVE and the long-press gestures.</string>
+    <!-- Help page: the text itself lives in docs/help/*.md and is bundled as an asset. -->
+    <string name="help_title">Help</string>
+    <string name="settings_help">Open the help page</string>
+    <string name="help_unavailable">The help text could not be loaded.</string>
 </resources>
