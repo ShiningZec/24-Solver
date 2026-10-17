@@ -1,0 +1,9 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+
+    <!-- The window background in the dark theme: Material3's own dark surface, kept here so that
+         values/colors-background.xml can define an off-white light background without changing how
+         the app already follows the system's dark mode. -->
+    <color name="background">#FF1C1B1F</color>
+
+</resources>

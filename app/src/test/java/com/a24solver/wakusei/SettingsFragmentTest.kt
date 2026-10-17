@@ -326,4 +326,60 @@ class SettingsFragmentTest {
         assertEquals("60", targetInput.text.toString())
         assertFalse(soundSwitch.isChecked)
     }
+
+    // ------------------------------------------------------------- long press
+
+    @Test
+    fun theLongPressFieldShowsTheThresholdAndStoresANewOne() {
+        openSettings()
+        assertEquals("500", longPressField.text?.toString())
+
+        typeLongPress("800")
+
+        assertEquals(800, settings().longPressMs)
+        assertNull("a legal value must not complain", longPressLayout.error)
+    }
+
+    @Test
+    fun anOutOfRangeLongPressIsReportedAndNotStored() {
+        openSettings()
+
+        typeLongPress("50")
+
+        assertNotNull("the field must complain", longPressLayout.error)
+        assertTrue(
+            "the message should mention the range, was ${longPressLayout.error}",
+            longPressLayout.error.toString().contains("100")
+        )
+        assertEquals("the stored value must not move", 500, settings().longPressMs)
+    }
+
+    @Test
+    fun clearingTheLongPressFieldIsMidEditNotAMistake() {
+        openSettings()
+
+        typeLongPress("")
+
+        assertNull("clearing the field is mid-edit, not a mistake", longPressLayout.error)
+        assertEquals(500, settings().longPressMs)
+    }
+
+    @Test
+    fun theLongPressValueSurvivesReopeningTheScreen() {
+        openSettings()
+        typeLongPress("900")
+
+        openSettings() // a second visit, i.e. a rebuilt view
+
+        assertEquals("900", longPressField.text?.toString())
+        assertEquals(900, settings().longPressMs)
+    }
+
+    private val longPressField: TextInputEditText get() = view(R.id.input_long_press)
+    private val longPressLayout: TextInputLayout get() = view(R.id.input_long_press_layout)
+
+    private fun typeLongPress(text: String) {
+        longPressField.setText(text)
+        shadowOf(Looper.getMainLooper()).idle()
+    }
 }

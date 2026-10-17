@@ -1,4 +1,4 @@
-<resources>
+<resources xmlns:tools="http://schemas.android.com/tools">
     <!-- The product's name, not a label: it stays the same in every locale. -->
     <string name="app_name" translatable="false">24 Solver</string>
     <!-- Labels shown in the action bar by the navigation graph -->
@@ -101,4 +101,11 @@
     <string name="help_title">Help</string>
     <string name="settings_help">Open the help page</string>
     <string name="help_unavailable">The help text could not be loaded.</string>
+    <!-- Long-press threshold: CLEAR and DEL share one value. -->
+    <string name="settings_long_press_title">Long-press threshold</string>
+    <string name="settings_long_press_hint">Milliseconds</string>
+    <string name="settings_long_press_helper">How long CLEAR and DEL have to be held. Default %1$d ms.</string>
+    <!-- A range, not a quantity: lint's PluralsCandidate heuristic sees "%d … and … %d" and
+         assumes a count, which this is not. -->
+    <string name="err_long_press_range" tools:ignore="PluralsCandidate">Must be between %1$d and %2$d ms</string>
 </resources>

@@ -2,6 +2,8 @@ package com.a24solver.wakusei
 
 import android.content.Context
 import android.os.Looper
+import android.os.SystemClock
+import android.view.MotionEvent
 import android.view.View
 import androidx.appcompat.widget.Toolbar
 import androidx.navigation.NavController
@@ -51,6 +53,22 @@ class DefaultTargetTest {
 
     private fun settings() = Settings(RuntimeEnvironment.getApplication())
 
+    /**
+     * Holds the key long enough to count as a long press. A real touch stream is dispatched so the
+     * app's own gesture detection runs — the platform's long click is not what the app uses.
+     */
+    private fun longClick(id: Int) {
+        val view = root.findViewById<View>(id)
+        val holdMs = Settings(root.context).longPressMs + 100L
+        val down = SystemClock.uptimeMillis()
+        view.dispatchTouchEvent(MotionEvent.obtain(down, down, MotionEvent.ACTION_DOWN, 1f, 1f, 0))
+        shadowOf(Looper.getMainLooper()).idleFor(java.time.Duration.ofMillis(holdMs))
+        view.dispatchTouchEvent(
+            MotionEvent.obtain(down, down + holdMs, MotionEvent.ACTION_UP, 1f, 1f, 0)
+        )
+        shadowOf(Looper.getMainLooper()).idle()
+    }
+
     private fun start() {
         markHelpSeen(RuntimeEnvironment.getApplication())
         controller = Robolectric.buildActivity(MainActivity::class.java).setup()
@@ -63,6 +81,22 @@ class DefaultTargetTest {
     }
 
     private fun text(id: Int): String = root.findViewById<android.widget.TextView>(id).text.toString()
+
+    /**
+     * Picks up the input screen's view again after it was rebuilt.
+     *
+     * Navigating to the settings screen and back destroys and re-creates the view while the fragment
+     * instance stays, so a held [root] would keep pointing at the detached one — and every assertion
+     * on it would read the screen as it was *before* the navigation.
+     */
+    private fun rebind() {
+        val navHost = controller.get().supportFragmentManager
+            .findFragmentById(R.id.nav_host_fragment_content_main) as NavHostFragment
+        navHost.childFragmentManager.executePendingTransactions()
+        root = (navHost.childFragmentManager.fragments
+            .filterIsInstance<FirstFragment>()
+            .first()).requireView()
+    }
 
     private fun click(id: Int) {
         root.findViewById<View>(id).performClick()
@@ -110,7 +144,7 @@ class DefaultTargetTest {
         click(R.id.button_next)
         assertEquals("TARGET: 7", text(R.id.text_target))
 
-        root.findViewById<View>(R.id.button_clear).performLongClick()
+        longClick(R.id.button_clear)
         shadowOf(Looper.getMainLooper()).idle()
 
         assertEquals("a CLEAR long press goes back to the configured default", "TARGET: -10", text(R.id.text_target))
@@ -190,5 +224,36 @@ class DefaultTargetTest {
             R.id.SecondFragment,
             navController.currentDestination?.id
         )
+    }
+
+    /**
+     * The bug: visiting the settings screen destroys the input screen's view and rebuilds it on the
+     * way back, and the rebuilt view used to re-read the configured default — so changing the default
+     * quietly changed the target in use.
+     */
+    @Test
+    fun aDefaultChangedInTheSettingsScreenDoesNotTouchTheTargetInUse() {
+        start()
+        click(R.id.button_target)
+        type(7)
+        click(R.id.button_next)
+        assertEquals("TARGET: 7", text(R.id.text_target))
+
+        clickSettingsButton()
+        shadowOf(Looper.getMainLooper()).idle()
+        assertEquals(R.id.SettingsFragment, navController.currentDestination?.id)
+        settings().defaultTargetPreset = DefaultTargetPreset.SIXTY
+
+        navController.navigateUp()
+        shadowOf(Looper.getMainLooper()).idle()
+        assertEquals(R.id.FirstFragment, navController.currentDestination?.id)
+        rebind() // the view was rebuilt; a stale reference would read the old screen
+
+        assertEquals(
+            "the screen was rebuilt, the puzzle was not restarted",
+            "TARGET: 7",
+            text(R.id.text_target)
+        )
+        assertEquals(60, settings().defaultTarget)
     }
 }

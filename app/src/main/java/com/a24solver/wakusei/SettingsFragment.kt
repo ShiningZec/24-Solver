@@ -49,8 +49,54 @@ class SettingsFragment : Fragment() {
         setUpLanguage()
         setUpDefaultTarget()
         setUpSound()
+        setUpLongPress()
         setUpHelp()
         render()
+    }
+
+    /**
+     * The long-press threshold: how long CLEAR and DEL have to be held. One number for both keys,
+     * read at the moment of the press, so it applies without restarting anything.
+     *
+     * Validated the same way as the default-target field: a value outside the range is reported on
+     * the field and never reaches the settings.
+     */
+    private fun setUpLongPress() {
+        binding.inputLongPress.setOnFocusChangeListener { _, hasFocus ->
+            if (!hasFocus) renderLongPress(showErrors = true)
+        }
+        binding.inputLongPress.doAfterTextChanged {
+            if (syncing) return@doAfterTextChanged
+            renderLongPress(showErrors = false)
+        }
+    }
+
+    private fun renderLongPress(showErrors: Boolean): Boolean {
+        val layout = binding.inputLongPressLayout
+        val text = binding.inputLongPress.text?.toString().orEmpty().trim()
+        val parsed = text.toIntOrNull()
+        val message = getString(
+            R.string.err_long_press_range,
+            Settings.MIN_LONG_PRESS_MS,
+            Settings.MAX_LONG_PRESS_MS
+        )
+        layout.error = null
+
+        return when {
+            // an empty or half-typed field is not an error while the user is still editing it
+            text.isEmpty() -> {
+                if (showErrors) layout.error = message
+                false
+            }
+            parsed == null || !Settings.isValidLongPress(parsed) -> {
+                layout.error = message
+                false
+            }
+            else -> {
+                settings.longPressMs = parsed
+                true
+            }
+        }
     }
 
     /**
@@ -192,6 +238,9 @@ class SettingsFragment : Fragment() {
             .takeIf { it }
             ?.let { getString(R.string.settings_default_target_helper, Settings.MAX_ABS_TARGET) }
         binding.switchSound.isChecked = settings.soundEnabled
+        // Locale.ROOT on purpose, like the target field: this text goes back through toIntOrNull()
+        binding.inputLongPress.setText(String.format(Locale.ROOT, "%d", settings.longPressMs))
+        binding.inputLongPressLayout.error = null
         syncing = false
 
         updateCurrentLabel()

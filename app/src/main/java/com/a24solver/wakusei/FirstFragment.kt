@@ -65,6 +65,16 @@ class FirstFragment : Fragment() {
 
     private var target = DEFAULT_TARGET
 
+    /**
+     * Whether [target] has already been established for the puzzle on screen.
+     *
+     * The fragment instance outlives its view (going to the settings screen and back rebuilds the
+     * view, not the fragment), so this is what tells "the screen is new" apart from "the view is
+     * new": only a genuinely new screen takes the default target from the settings, and a target the
+     * user is working with is never overwritten behind their back.
+     */
+    private var targetInitialised = false
+
     /** The TARGET latch: true while the keypad edits the target instead of the candidates. */
     private var targetEditing = false
 
@@ -125,7 +135,7 @@ class FirstFragment : Fragment() {
     }
 
     /**
-     * CLEAR long press ([LONG_PRESS_MS]): the deliberate "start over" gesture — candidates and
+     * CLEAR long press (see [LongPressGesture], threshold from the settings): the deliberate
      * target both go back to their defaults, and it is the only CLEAR variant that reports back.
      * It replaced the earlier double tap, which was too easy to trigger by accident.
      */
@@ -138,7 +148,7 @@ class FirstFragment : Fragment() {
     }
 
     /**
-     * DEL long press ([LONG_PRESS_MS]): "throw away what I am typing; if I am not typing anything,
+     * DEL long press (same gesture): "throw away what I am typing; if I am not typing anything,
      * take back the last number I committed".
      *
      *  1. the buffer of the active scope is not empty → empty it. The active scope is the candidate
@@ -161,21 +171,27 @@ class FirstFragment : Fragment() {
     }
 
     /**
-     * Weak, Android-managed key feedback for the long-press gestures.
+     * Android-managed key feedback for the long-press gestures.
      *
-     * [HapticFeedbackConstants.KEYBOARD_TAP] goes through [View.performHapticFeedback]: no
-     * permission (no Vibrator access) and the system silences it whenever the user turns touch
-     * feedback off (`Settings.System.HAPTIC_FEEDBACK_ENABLED`), so the phone's settings stay in
-     * charge instead of the app.
+     * [HapticFeedbackConstants.LONG_PRESS] goes through [View.performHapticFeedback]: no permission
+     * (no `Vibrator` access) and the system silences it whenever the user turns touch feedback off
+     * (`Settings.System.HAPTIC_FEEDBACK_ENABLED`), so the phone's settings stay in charge instead of
+     * the app.
      *
-     * The tick is requested on the *window's* view because the keys themselves declare
-     * `android:hapticFeedbackEnabled="false"` (see fragment_first.xml): that switch exists only to
-     * mute the platform's generic long-press buzz, which would otherwise fire on every long press
-     * — including a DEL press that had nothing to delete. This way a tick means exactly what it
-     * says: the requested action really happened, and it is still the system's own feedback.
+     * Two details are fixes for the bug where a long press never actually vibrated:
+     *
+     *  - it is requested on **the key that was pressed** (it used to be requested on the window root
+     *    to dodge `android:hapticFeedbackEnabled="false"` on the keys — but the keys no longer need
+     *    that attribute, because the app measures the long press itself and the platform's own buzz
+     *    never fires; `FirstFragmentTest` asserts that the keys keep haptics enabled);
+     *  - the constant is `LONG_PRESS`, not `KEYBOARD_TAP`: the keyboard tick is the faintest haptic
+     *    Android has and is nearly imperceptible on many devices, while this gesture is a deliberate
+     *    "start over" and deserves the standard long-press thump.
+     *
+     * The global user setting is deliberately respected: no `FLAG_IGNORE_GLOBAL_SETTING`.
      */
     private fun hapticFeedback(view: View) {
-        view.rootView.performHapticFeedback(HapticFeedbackConstants.KEYBOARD_TAP)
+        view.performHapticFeedback(HapticFeedbackConstants.LONG_PRESS)
     }
 
     private fun onNextPressed() {
@@ -432,21 +448,27 @@ class FirstFragment : Fragment() {
             onClearPressed()
             playSound(KeySound.TONE)
         }
-        binding.buttonClear.setOnLongClickListener {
-            onClearLongPressed()
-            playSound(KeySound.RESET)
-            true
-        }
+        LongPressGesture(
+            view = binding.buttonClear,
+            thresholdMs = { settings.longPressMs },
+            onLongPress = {
+                onClearLongPressed()
+                playSound(KeySound.RESET)
+            }
+        )
 
         binding.buttonDel.setOnClickListener {
             onDeletePressed()
             playSound(KeySound.TONE)
         }
-        binding.buttonDel.setOnLongClickListener {
-            onDeleteLongPressed()
-            playSound(KeySound.RESET)
-            true
-        }
+        LongPressGesture(
+            view = binding.buttonDel,
+            thresholdMs = { settings.longPressMs },
+            onLongPress = {
+                onDeleteLongPressed()
+                playSound(KeySound.RESET)
+            }
+        )
 
         // SOLVE is the one key that plays a phrase rather than a single note.
         binding.buttonSolve.setOnClickListener {
@@ -491,11 +513,16 @@ class FirstFragment : Fragment() {
         super.onViewCreated(view, savedInstanceState)
 
         setupButtons()
-        if (savedInstanceState != null) {
-            restoreInput(savedInstanceState)
-        } else {
-            // a fresh screen starts on the configured default target
-            target = settings.defaultTarget
+        when {
+            savedInstanceState != null -> restoreInput(savedInstanceState)
+            // Only the *first* time this screen exists does the configured default get applied.
+            // Visiting the settings screen destroys this fragment's view and rebuilds it when the
+            // user comes back — with a null savedInstanceState — and re-reading the default there
+            // was the bug that made changing the default overwrite the target in use.
+            !targetInitialised -> {
+                target = settings.defaultTarget
+                targetInitialised = true
+            }
         }
         refreshDisplay()
         offerHelpOnFirstStart(savedInstanceState)
@@ -543,6 +570,7 @@ class FirstFragment : Fragment() {
         numbers.clear()
         state.getIntArray(KEY_NUMBERS)?.forEach(numbers::add)
         target = state.getInt(KEY_TARGET, DEFAULT_TARGET)
+        targetInitialised = true
         numberInput = state.getString(KEY_NUMBER_INPUT).orEmpty()
         targetInput = state.getString(KEY_TARGET_INPUT).orEmpty()
 
@@ -584,14 +612,6 @@ class FirstFragment : Fragment() {
         /** Longest digit string a buffer accepts. */
         private const val MAX_DIGITS = 6
 
-        /**
-         * Long-press threshold in milliseconds (x = 500).
-         *
-         * The gestures use the platform's own long-press timeout
-         * ([android.view.ViewConfiguration.getLongPressTimeout], 500 ms on every standard Android
-         * version), so this constant documents the value instead of enforcing it. Making x
-         * configurable is a P2 TODO (see README).
-         */
-        const val LONG_PRESS_MS = 500L
+
     }
 }

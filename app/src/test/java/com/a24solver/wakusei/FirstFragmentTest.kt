@@ -1,6 +1,8 @@
 package com.a24solver.wakusei
 
 import android.os.Looper
+import android.os.SystemClock
+import android.view.MotionEvent
 import android.util.TypedValue
 import android.view.HapticFeedbackConstants
 import android.view.View
@@ -10,6 +12,7 @@ import android.widget.TextView
 import androidx.core.view.ViewCompat
 import androidx.navigation.NavController
 import androidx.navigation.fragment.NavHostFragment
+import com.a24solver.wakusei.settings.Settings
 import com.google.android.material.button.MaterialButton
 import com.google.android.material.button.MaterialButtonToggleGroup
 import org.junit.Assert.assertEquals
@@ -24,6 +27,7 @@ import org.robolectric.RuntimeEnvironment
 import org.robolectric.Shadows.shadowOf
 import org.robolectric.android.controller.ActivityController
 import org.robolectric.annotation.Config
+import java.time.Duration
 import org.robolectric.shadows.ShadowToast
 
 /**
@@ -87,9 +91,21 @@ class FirstFragmentTest {
         shadowOf(Looper.getMainLooper()).idle()
     }
 
-    /** Performs the view's long click, i.e. what a ≥500 ms press ends up calling. */
-    private fun longClick(id: Int) {
-        root.findViewById<View>(id).performLongClick()
+    /**
+     * Holds the key for longer than the configured threshold, the way a finger does: a real touch
+     * stream, so the app's own gesture detection (not the platform's long click) is what runs.
+     */
+    private fun longClick(id: Int, holdMs: Long = settings().longPressMs + 100L) {
+        press(root.findViewById(id), holdMs)
+    }
+
+    /** Dispatches ACTION_DOWN, waits [holdMs] of virtual time, then ACTION_UP. */
+    private fun press(view: View, holdMs: Long) {
+        val down = SystemClock.uptimeMillis()
+        view.dispatchTouchEvent(MotionEvent.obtain(down, down, MotionEvent.ACTION_DOWN, 1f, 1f, 0))
+        shadowOf(Looper.getMainLooper()).idleFor(Duration.ofMillis(holdMs))
+        val up = down + holdMs
+        view.dispatchTouchEvent(MotionEvent.obtain(down, up, MotionEvent.ACTION_UP, 1f, 1f, 0))
         shadowOf(Looper.getMainLooper()).idle()
     }
 
@@ -102,11 +118,17 @@ class FirstFragmentTest {
     private fun toastCount(): Int = ShadowToast.shownToastCount()
 
     /**
-     * The tick the app requested itself. The keys carry android:hapticFeedbackEnabled="false" (to
-     * mute the platform's generic long-press buzz), so the app asks the window's view — that is
-     * the shadow to inspect.
+     * The tick the app requested on [id] itself.
+     *
+     * It is asked for on the key that was pressed, not on the window root (that was the bug: the
+     * keys declared `android:hapticFeedbackEnabled="false"`, so a request through them went
+     * nowhere). The value is `LONG_PRESS` — a real thump — rather than the nearly imperceptible
+     * `KEYBOARD_TAP` the app used to ask for.
      */
-    private fun lastAppHaptic(): Int = shadowOf(root.rootView).lastHapticFeedbackPerformed()
+    private fun lastAppHaptic(id: Int = R.id.button_clear): Int =
+        shadowOf(root.findViewById<View>(id)).lastHapticFeedbackPerformed()
+
+    private fun settings() = Settings(root.context)
 
     private fun awaitDestination(destinationId: Int, timeoutMs: Long = 20_000): Boolean {
         val deadline = System.currentTimeMillis() + timeoutMs
@@ -413,8 +435,8 @@ class FirstFragmentTest {
 
         assertEquals("NUMBERS: (none)", text(R.id.text_numbers))
         assertEquals("TARGET: 24", text(R.id.text_target))
-        assertEquals("a long press ticks", HapticFeedbackConstants.KEYBOARD_TAP, lastAppHaptic())
-        assertFalse("the platform's own long-press buzz is muted", key(R.id.button_clear).isHapticFeedbackEnabled)
+        assertEquals("a long press ticks", HapticFeedbackConstants.LONG_PRESS, lastAppHaptic())
+        assertTrue("the key must be able to vibrate", key(R.id.button_clear).isHapticFeedbackEnabled)
         assertEquals(root.context.getString(R.string.msg_cleared_all), latestToast())
     }
 
@@ -439,8 +461,8 @@ class FirstFragmentTest {
         longClick(R.id.button_del)
 
         assertEquals("NUMBERS: 1, 2", text(R.id.text_numbers))
-        assertEquals(HapticFeedbackConstants.KEYBOARD_TAP, lastAppHaptic())
-        assertFalse("the platform's own long-press buzz is muted", key(R.id.button_del).isHapticFeedbackEnabled)
+        assertEquals(HapticFeedbackConstants.LONG_PRESS, lastAppHaptic(R.id.button_del))
+        assertTrue("the key must be able to vibrate", key(R.id.button_del).isHapticFeedbackEnabled)
     }
 
     @Test
@@ -458,7 +480,7 @@ class FirstFragmentTest {
             text(R.id.text_current_input)
         )
         assertEquals("and the committed numbers are left alone", "NUMBERS: 4", text(R.id.text_numbers))
-        assertEquals(HapticFeedbackConstants.KEYBOARD_TAP, lastAppHaptic())
+        assertEquals(HapticFeedbackConstants.LONG_PRESS, lastAppHaptic(R.id.button_del))
         assertEquals("a long press never reports with a toast", 0, toastCount())
     }
 
@@ -484,7 +506,7 @@ class FirstFragmentTest {
 
         assertEquals("TARGET INPUT: _", text(R.id.text_current_input))
         assertEquals("the target itself is untouched", "TARGET: 24", text(R.id.text_target))
-        assertEquals(HapticFeedbackConstants.KEYBOARD_TAP, lastAppHaptic())
+        assertEquals(HapticFeedbackConstants.LONG_PRESS, lastAppHaptic(R.id.button_del))
     }
 
     @Test
@@ -493,7 +515,7 @@ class FirstFragmentTest {
 
         assertEquals("NUMBERS: (none)", text(R.id.text_numbers))
         assertEquals("INPUT: _", text(R.id.text_current_input))
-        assertEquals("nothing was removed, so nothing ticks", -1, lastAppHaptic())
+        assertEquals("nothing was removed, so nothing ticks", -1, lastAppHaptic(R.id.button_del))
         assertEquals(0, toastCount())
     }
 
@@ -656,5 +678,32 @@ class FirstFragmentTest {
         click(R.id.button_target) // leaving the scope commits the restored buffer
         assertEquals("TARGET: 60", text(R.id.text_target))
         assertEquals("INPUT: 7", text(R.id.text_current_input)) // the other buffer survived too
+    }
+
+    // ------------------------------------------------- long-press threshold
+
+    @Test
+    fun theLongPressThresholdComesFromTheSettings() {
+        settings().longPressMs = 200
+        type(1)
+        click(R.id.button_next) // NUMBERS: 1
+
+        // 250 ms would be a tap at the platform's 500 ms, but a long press at the configured 200 ms
+        longClick(R.id.button_del, holdMs = 250)
+
+        assertEquals("NUMBERS: (none)", text(R.id.text_numbers))
+        assertEquals(HapticFeedbackConstants.LONG_PRESS, lastAppHaptic(R.id.button_del))
+    }
+
+    @Test
+    fun aPressShorterThanTheConfiguredThresholdIsStillATap() {
+        type(1)
+        click(R.id.button_next) // NUMBERS: 1
+        type(7) // INPUT: 7
+
+        press(key(R.id.button_del), holdMs = 300) // below the 500 ms default
+
+        assertEquals("a tap backspaces", "INPUT: _", text(R.id.text_current_input))
+        assertEquals("and it must not be a long press too", "NUMBERS: 1", text(R.id.text_numbers))
     }
 }

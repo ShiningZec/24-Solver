@@ -48,12 +48,11 @@ INPUT: 4
 | 手势 | 行为 |
 | --- | --- |
 | `CLEAR` 点按 | 清空当前作用域的那一份（候选数，或目标回到默认值），**完全静默** |
-| `CLEAR` 长按 | 候选数与目标全部复位 + Toast + 轻振动 |
+| `CLEAR` 长按 | 候选数与目标全部复位 + Toast + 轻振动（`LONG_PRESS`） |
 | `DEL` 长按 | ① 当前输入不为空 → 清空输入；② 输入为空但已有候选数 → 撤销最后一个；③ 都为空 → 什么都不做（不弹提示、不振动） |
 
-振动走系统托管的 `KEYBOARD_TAP`：无需任何权限，用户关掉系统触感反馈后即静默；
-「有振动」恰好等价于「动作真的发生了」。
-- 注：当前版本存在 bug，振动不能正常发生。
+两个长按共用**同一个可配置阈值**（设置页「长按阈值」，100–2000 毫秒，默认 500），因此不依赖平台固定的 `ViewConfiguration` 超时——按住多久算长按由应用自己计时（`LongPressGesture`）。振动走系统托管的 `LONG_PRESS`：无需任何权限，用户关掉系统触感反馈后即静默；「有振动」恰好等价于「动作真的发生了」。
+- 已发现并解决的 bug：此前长按**不会**振动。原因有二 —— 请求的是几乎无感的 `KEYBOARD_TAP` 常量，且请求发在窗口根视图上（两个键自己声明了 `hapticFeedbackEnabled="false"`）。现在改为在**被按下的那个键**上请求 `LONG_PRESS`，并让键保持可振动（测试守着这一点）。
 
 ### 结果界面
 
@@ -84,10 +83,11 @@ INPUT: 4
 | 语言 | 跟随系统 / 中文 / English / 日本語；**离开设置页时**生效（旋转屏幕不算离开） |
 | 默认目标数 | 滑杆节点 `CUSTOMIZE` `-24` `-10` `0` `10` `24` `60` + 自定义数字输入 |
 | 按键音效 | 总开关 |
+| 长按阈值 | 数字输入框，CLEAR 与 DEL 共用，100–2000 毫秒（默认 500）；越界只在输入框报错、不写入 |
 | 帮助 | 打开帮助页面 |
 
 默认目标只决定「新开界面从哪开始」与「长按 CLEAR 回到哪」，**不应该改动当前正在使用的目标**。
-- 注：当前的版本存在 bug，改动默认 TARGET 可能会导致当前 TARGET 被更改。
+- 已发现并解决的 bug：此前从设置页返回时会重新读取默认目标，从而把当前目标覆盖掉。原因是「界面被重建」被当成了「新的一次计算」；现在只有本次计算**首次创建**时才读默认值（`FirstFragment.targetInitialised`），重建只重建界面、不重开这局。
 
 ### 帮助页面
 
@@ -95,8 +95,13 @@ INPUT: 4
 - 正文来自 `docs/help/*.md`（构建时作为 assets 打包，只有这一份源文件），跟随应用语言。
 - 支持的分隔语法只有三种：`# ` 标题、空行分段、`**加粗**`——够用，且不需要引入 Markdown 依赖。
 
-### 语言
+### 外观
 
+- 亮色模式的窗口底色是**灰白** `#F3F3F1`（Material3 的默认纯白 `#FFFBFE` 在整屏大色块按键上偏刺眼），
+  定义在 `values/colors-background.xml`；`values-night` 里有对应的深色值，所以跟随系统深色时不会突然变亮。
+- 暗色模式**尚未完成**（见 TODO）：主题本身跟随系统，但配色、按键与图标还没有针对深色校对。
+
+### 语言
 - 界面文案三语齐全（英文是默认与兜底），**漏翻会让 lint 失败**。
 - 帮助页文本三语各一份 `docs/help/help_doc*.md`。
 - 默认跟随系统；`AppLocalesMetadataHolderService` 负责 API 33 以下的持久化，API 33+ 交给系统。
@@ -108,14 +113,14 @@ INPUT: 4
 需要 JDK 17+ 与 Android SDK。
 
 ```bash
-./gradlew.bat :app:testDebugUnitTest          # 单元测试（232 例，Robolectric）
+./gradlew.bat :app:testDebugUnitTest          # 单元测试（241 例，Robolectric）
 ./gradlew.bat :app:lintDebug                  # 必须输出 "No issues found."
 ./gradlew.bat :app:assembleDebug              # debug APK
 ./gradlew.bat :app:assembleDebugAndroidTest   # instrumentation APK
 ./gradlew.bat :app:connectedDebugAndroidTest  # 真机/模拟器上的启动冒烟测试
 ```
 
-### 测试清单（232 例）
+### 测试清单（241 例）
 
 | 测试类 | 覆盖内容 | 数量 |
 | --- | --- | --- |
@@ -123,11 +128,11 @@ INPUT: 4
 | `solver.RationalTest` | 精确有理数的构造/约分/四则/比较 | 8 |
 | `solver.ExpressionTest` | 括号最少化、规范形、打印往返 | 6 |
 | `solver.SolverPurityTest` | `solver` 包不引用 `android`/`androidx`（目录与 jar 两种产物都扫） | 1 |
-| `FirstFragmentTest` | 布局、按键接线、拉杆、CLEAR/DEL 点按与长按、校验、求解往返、切换、旋转不丢输入 | 32 |
-| `SettingsFragmentTest` | 语言四项与「只记录不生效」、离开设置页才切换、旋转不算离开、预设与自定义、音效开关、回显、帮助入口 | 15 |
+| `FirstFragmentTest` | 布局、按键接线、拉杆、CLEAR/DEL 点按与长按（含自定义阈值、短按仍是点按）、振动常量、校验、求解往返、切换、旋转不丢输入 | 34 |
+| `SettingsFragmentTest` | 语言四项与「只记录不生效」、离开设置页才切换、旋转不算离开、预设与自定义、音效开关、长按阈值输入（含越界与回显）、帮助入口 | 19 |
 | `LanguageDeferralTest` | 选语言不改当前语言、应用那一步才切换、应用内选择优先、manifest 指向自己的 Application | 8 |
-| `settings.SettingsTest` | 默认值、预设取值、±16384 校验、持久化、语言标签匹配 | 8 |
-| `DefaultTargetTest` | 新界面从默认目标开始、长按 CLEAR 回到默认、改设置不动当前目标、设置入口与返回 | 7 |
+| `settings.SettingsTest` | 默认值、预设取值、±16384 校验、长按阈值默认值与范围、持久化、语言标签匹配 | 10 |
+| `DefaultTargetTest` | 新界面从默认目标开始、长按 CLEAR 回到默认、改设置不动当前目标、**从设置页返回后仍不动当前目标**、设置入口与返回 | 8 |
 | `KeypadSoundTest` | 15 键发声、一轮用遍音集、音符不截断、音阶起音位置、其它界面不发声音、总开关 | 12 |
 | `HelpFragmentTest` | 帮助页渲染标题/段落/加粗、跟随语言、首启自动打开且只一次、设置入口 | 9 |
 | `help.HelpMarkdownTest` | 标题/分段/单换行/空行折叠/CRLF/空文档/非标题 `#`/加粗/未闭合标记 | 10 |
@@ -146,6 +151,8 @@ INPUT: 4
 | `SolveResultViewModelTest` | 显示哪一份解集、两组相同时回落、选择保留 | 4 |
 | `IconTest` | 图标资源可解析、标记在安全圆内 | 3 |
 | `LaunchSmokeTest`（androidTest） | 真机启动并显示输入界面 | 1 |
+
+单元测试共 **241** 例（`LaunchSmokeTest` 是 instrumentation 测试、需要真机，不计入这个数字）。
 
 ---
 
@@ -190,13 +197,13 @@ TUTORIAL.md                     # 英文快速上手
 
 ## TODO
 
-- [ ] 解决 bug：长按 [CLEAR] 或 [DEL] 应当产生的振动不能正常发生。
-- [ ] 解决 bug：在设置中改动默认 TARGET 会导致当前 TARGET 被更改。
-
-- [ ] 让长按阈值可配置（当前固定为系统默认 500 ms），`CLEAR` 与 `DEL` 共用同一来源
+- [x] 解决 bug：长按 [CLEAR] 或 [DEL] 的振动不触发（见「长按手势」的说明）
+- [x] 解决 bug：在设置中改动默认 TARGET 会连带改掉当前 TARGET（见「设置」的说明）
+- [x] 长按阈值可配置：设置页数字输入框，`CLEAR` 与 `DEL` 共用，默认 500、范围 100–2000 毫秒
 - [ ] 请母语者校对界面文案与帮助文本（完整性由 lint 与测试保证，用词没有）
 - [ ] 答案列表换成 `RecyclerView`
 - [ ] 把 `solver/` 抽成纯 Kotlin JVM 模块（`SolverPurityTest` 已守住依赖边界）
 - [ ] 在真机上细调音效参数
 - [ ] 打开 release 的 R8（`optimization.enable = true`）+ keep 规则，并真机冒烟
 - [ ] 帮助页面：考虑加入交互式分步引导（遮罩高亮 + 分步说明）
+- [ ] **添加暗色模式支持**：目前主题虽然跟随系统（`Theme.Material3.DayNight`，窗口背景已在 `values-night` 给了深色），但整套配色、按键与图标尚未针对暗色校对，尚未完成

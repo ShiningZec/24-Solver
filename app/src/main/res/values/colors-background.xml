@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+
+    <!-- The window background of the light theme.
+         Material3's default is pure white (#FFFBFE), which on a full screen of large tinted keys reads
+         as a glare — an off-white keeps the text contrast and lets the keypad's rose and grey keys
+         carry the contrast instead. The dark value lives in values-night/colors.xml so following the
+         system theme keeps working. -->
+    <color name="background">#FFF3F3F1</color>
+
+</resources>

@@ -1,6 +1,8 @@
 package com.a24solver.wakusei
 
 import android.os.Looper
+import android.os.SystemClock
+import android.view.MotionEvent
 import android.view.View
 import androidx.navigation.NavController
 import androidx.navigation.fragment.NavHostFragment
@@ -84,8 +86,19 @@ class KeypadSoundTest {
         shadowOf(Looper.getMainLooper()).idle()
     }
 
+    /**
+     * Holds the key long enough to count as a long press. A real touch stream is dispatched so the
+     * app's own gesture detection runs — the platform's long click is not what the app uses.
+     */
     private fun longClick(id: Int) {
-        root.findViewById<View>(id).performLongClick()
+        val view = root.findViewById<View>(id)
+        val holdMs = Settings(root.context).longPressMs + 100L
+        val down = SystemClock.uptimeMillis()
+        view.dispatchTouchEvent(MotionEvent.obtain(down, down, MotionEvent.ACTION_DOWN, 1f, 1f, 0))
+        shadowOf(Looper.getMainLooper()).idleFor(java.time.Duration.ofMillis(holdMs))
+        view.dispatchTouchEvent(
+            MotionEvent.obtain(down, down + holdMs, MotionEvent.ACTION_UP, 1f, 1f, 0)
+        )
         shadowOf(Looper.getMainLooper()).idle()
     }
 

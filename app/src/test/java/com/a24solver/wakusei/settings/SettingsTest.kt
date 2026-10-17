@@ -147,4 +147,30 @@ class SettingsTest {
         settings.requestLanguage(AppLanguage.SYSTEM)
         assertEquals(AppLanguage.SYSTEM, settings.requestedLanguage)
     }
+
+    @Test
+    fun theLongPressDefaultsToThePlatformValueAndRoundTrips() {
+        val settings = Settings(context)
+        assertEquals(Settings.DEFAULT_LONG_PRESS_MS, settings.longPressMs)
+        assertEquals(500, settings.longPressMs)
+
+        settings.longPressMs = 800
+
+        assertEquals(800, settings.longPressMs)
+        assertEquals("it must be stored, not cached", 800, Settings(context).longPressMs)
+    }
+
+    @Test
+    fun theLongPressRangeIsEnforcedOnBothEnds() {
+        for (value in listOf(Settings.MIN_LONG_PRESS_MS, 500, Settings.MAX_LONG_PRESS_MS)) {
+            assertTrue("$value should be allowed", Settings.isValidLongPress(value))
+        }
+        for (value in listOf(Settings.MIN_LONG_PRESS_MS - 1, Settings.MAX_LONG_PRESS_MS + 1, -1, 0)) {
+            assertFalse("$value should be refused", Settings.isValidLongPress(value))
+        }
+
+        val settings = Settings(context)
+        assertThrows(IllegalArgumentException::class.java) { settings.longPressMs = 50 }
+        assertEquals("the stored value must not move", 500, settings.longPressMs)
+    }
 }

@@ -143,6 +143,22 @@ class Settings(context: Context) {
         }
 
     /**
+     * How long a press on CLEAR or DEL has to last before it counts as a long press, in
+     * milliseconds. One value for both keys, by design: they are the same gesture.
+     *
+     * The platform's own timeout is a device-wide constant, so the app measures the press itself
+     * (see `LongPressGesture`) and this is the number it uses.
+     */
+    var longPressMs: Int
+        get() = preferences.getInt(KEY_LONG_PRESS, DEFAULT_LONG_PRESS_MS)
+        set(value) {
+            require(isValidLongPress(value)) {
+                "$value ms is outside $MIN_LONG_PRESS_MS..$MAX_LONG_PRESS_MS"
+            }
+            preferences.edit { putInt(KEY_LONG_PRESS, value) }
+        }
+
+    /**
      * Whether the help page has already been shown on its own. It is opened automatically once, on
      * the very first start, and never again — afterwards it is one tap away in the settings screen.
      *
@@ -182,11 +198,26 @@ class Settings(context: Context) {
         const val MAX_ABS_TARGET = 16384
         const val DEFAULT_TARGET = 24
 
+        /** The platform's own long-press timeout, and the value a fresh install starts with. */
+        const val DEFAULT_LONG_PRESS_MS = 500
+
+        /**
+         * The range the long-press threshold may be set to.
+         *
+         * Below the minimum a long press would fire during an ordinary tap; above the maximum the
+         * user would have to hold the key so long that the gesture feels broken rather than slow.
+         */
+        const val MIN_LONG_PRESS_MS = 100
+        const val MAX_LONG_PRESS_MS = 2000
+
+        fun isValidLongPress(value: Int): Boolean = value in MIN_LONG_PRESS_MS..MAX_LONG_PRESS_MS
+
         /** Visible to the tests, which clear it between cases. */
         internal const val FILE_NAME = "wakusei.settings"
 
         private const val KEY_LANGUAGE = "language"
         private const val KEY_SOUND = "soundEnabled"
+        private const val KEY_LONG_PRESS = "longPressMs"
         private const val KEY_HELP_SHOWN = "helpShown"
         private const val KEY_PRESET = "defaultTargetPreset"
         private const val KEY_CUSTOM_TARGET = "customDefaultTarget"

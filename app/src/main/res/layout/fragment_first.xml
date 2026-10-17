@@ -213,7 +213,6 @@
             <Button
                 android:id="@+id/button_clear"
                 style="@style/Widget.App.KeypadButton.Special"
-                android:hapticFeedbackEnabled="false"
                 android:layout_width="0dp"
                 android:layout_height="match_parent"
                 android:layout_marginStart="4dp"
@@ -224,7 +223,6 @@
             <Button
                 android:id="@+id/button_del"
                 style="@style/Widget.App.KeypadButton.Special"
-                android:hapticFeedbackEnabled="false"
                 android:layout_width="0dp"
                 android:layout_height="match_parent"
                 android:layout_marginStart="4dp"
