@@ -42,7 +42,7 @@ Tap `TARGET`. The key stays lit and the keypad now types the target instead of n
 - Tap `TARGET` again to leave: whatever you typed is written back to `TARGET:`.
 - Or press `NEXT` to keep it and stay in target mode.
 - Tap `TARGET` twice without typing anything and the target simply stays as it was.
-- Values beyond ±16384 are refused, and the key stays lit so you can fix the input.
+- Values beyond $\pm 16384$ are refused, and the key stays lit so you can fix the input.
 
 ## Starting over
 
