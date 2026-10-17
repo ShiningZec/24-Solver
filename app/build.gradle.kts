@@ -40,6 +40,15 @@ android {
     buildFeatures {
         viewBinding = true
     }
+    sourceSets {
+        getByName("main") {
+            // The help documents are bundled as assets straight out of docs/help: one canonical copy,
+            // read at runtime by HelpText. Copying them into res/ or assets/ would create a second
+            // copy that can drift from the archived documentation, and the help text is exactly the
+            // kind of thing nobody re-checks after a copy.
+            assets.srcDirs("src/main/assets", "../docs/help")
+        }
+    }
     testOptions {
         // lets the Robolectric unit tests see the merged resources/manifest
         unitTests.isIncludeAndroidResources = true
