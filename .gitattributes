@@ -1,0 +1,16 @@
+# Line endings, pinned where getting them wrong actually breaks something.
+#
+# The Gradle wrapper script is the important one: with CRLF a Linux or macOS runner dies on
+# `./gradlew` with "/usr/bin/env: 'sh\r': No such file or directory", which looks like a build
+# failure but is just a checkout artefact. Windows needs CRLF in the .bat wrapper instead.
+
+gradlew  text eol=lf
+*.sh     text eol=lf
+*.bat    text eol=crlf
+
+# This file must stay LF itself: with CRLF every pattern would carry a stray CR.
+.gitattributes text eol=lf
+
+*.jar    binary
+*.png    binary
+*.webp   binary

@@ -2,7 +2,7 @@ name: Android CI
 
 on:
   push:
-    branches: [ master, main ]
+    branches: [ main ]
   pull_request:
   workflow_dispatch:
 
@@ -26,8 +26,15 @@ jobs:
           distribution: temurin
           java-version: '25'
 
+      # setup-android@v3 defaults to `packages: 'tools platform-tools'`, and the legacy `tools`
+      # package is no longer in the SDK repository — sdkmanager then exits 1 with
+      # "Failed to find package 'tools'" before the build even starts. platform-tools is all this
+      # job needs: the action accepts the licences, so Gradle downloads the platform and
+      # build-tools the module asks for.
       - name: Set up Android SDK
         uses: android-actions/setup-android@v3
+        with:
+          packages: 'platform-tools'
 
       - name: Set up Gradle
         uses: gradle/actions/setup-gradle@v4
