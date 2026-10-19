@@ -174,11 +174,11 @@ class SolverTest {
         assertThrows(IllegalArgumentException::class.java) {
             Solver.solve(24, List(9) { 1 })
         }
-        assertThrows(IllegalArgumentException::class.java) { Solver.solve(24, listOf(256)) }
-        assertThrows(IllegalArgumentException::class.java) { Solver.solve(24, listOf(-256)) }
+        assertThrows(IllegalArgumentException::class.java) { Solver.solve(24, listOf(1000)) }
+        assertThrows(IllegalArgumentException::class.java) { Solver.solve(24, listOf(-1000)) }
         // the bounds themselves are inside the contract
-        assertTrue(Solver.solve(255, listOf(255)).hasSolutions)
-        assertTrue(Solver.solve(-255, listOf(-255)).hasSolutions)
+        assertTrue(Solver.solve(999, listOf(999)).hasSolutions)
+        assertTrue(Solver.solve(-999, listOf(-999)).hasSolutions)
     }
 
     @Test

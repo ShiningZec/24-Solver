@@ -247,12 +247,12 @@ class SettingsFragmentTest {
         typeTarget("60")
         assertEquals(60, settings().customDefaultTarget)
 
-        typeTarget("99999")
+        typeTarget("999999")
 
         assertNotNull("the field must complain", targetLayout.error)
         assertTrue(
             "the message should mention the bound, was ${targetLayout.error}",
-            targetLayout.error.toString().contains("16384")
+            targetLayout.error.toString().contains("99999")
         )
         assertEquals("the stored value must not move", 60, settings().customDefaultTarget)
     }
@@ -271,7 +271,7 @@ class SettingsFragmentTest {
     fun anEmptyingFieldIsNotAnErrorWhileTyping() {
         openSettings()
         selectNode(DefaultTargetPreset.CUSTOMIZE)
-        typeTarget("99999")
+        typeTarget("999999")
         assertNotNull(targetLayout.error)
 
         typeTarget("")

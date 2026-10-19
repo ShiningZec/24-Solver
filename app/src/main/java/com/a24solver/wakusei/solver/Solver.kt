@@ -63,7 +63,7 @@ object Solver {
     const val MAX_NUMBERS = 8
 
     /** Every input number must satisfy `-MAX_ABS_NUMBER < x < MAX_ABS_NUMBER`. */
-    const val MAX_ABS_NUMBER = 256
+    const val MAX_ABS_NUMBER = 1000
 
     /**
      * Upper bound on the number of expressions the memo tables may hold, across all masks.

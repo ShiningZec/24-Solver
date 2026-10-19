@@ -92,8 +92,8 @@ class SettingsTest {
         assertThrows(IllegalArgumentException::class.java) {
             settings.customDefaultTarget = -Settings.MAX_ABS_TARGET - 1
         }
-        assertFalse(Settings.isValidTarget(16385))
-        assertTrue(Settings.isValidTarget(-16384))
+        assertFalse(Settings.isValidTarget(100000))
+        assertTrue(Settings.isValidTarget(-99999))
     }
 
     @Test

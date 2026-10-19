@@ -195,7 +195,7 @@ class Settings(context: Context) {
         get() = defaultTargetPreset.presetValue ?: customDefaultTarget
 
     companion object {
-        const val MAX_ABS_TARGET = 16384
+        const val MAX_ABS_TARGET = 99999
         const val DEFAULT_TARGET = 24
 
         /** The platform's own long-press timeout, and the value a fresh install starts with. */

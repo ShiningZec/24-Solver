@@ -601,7 +601,7 @@ class FirstFragment : Fragment() {
         const val MAX_NUMBERS = 5
 
         /** Strict upper bound: a candidate must satisfy `|x| < MAX_ABS_NUMBER`. */
-        const val MAX_ABS_NUMBER = 256
+        const val MAX_ABS_NUMBER = 1000
 
         /** The target bound, shared with the settings screen that configures the default. */
         const val MAX_ABS_TARGET = Settings.MAX_ABS_TARGET

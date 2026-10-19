@@ -334,13 +334,13 @@ class FirstFragmentTest {
     @Test
     fun leavingTargetScopeWithAnInvalidValueKeepsTheLatchOn() {
         click(R.id.button_target)
-        type(1, 6, 3, 8, 5) // out of range
+        type(1, 0, 0, 0, 0, 0) // out of range
         click(R.id.button_target)
 
         assertTrue(targetLatch().isChecked) // still editing: the typed value is not lost
-        assertEquals("TARGET INPUT: 16385", text(R.id.text_current_input))
+        assertEquals("TARGET INPUT: 100000", text(R.id.text_current_input))
         assertEquals("TARGET: 24", text(R.id.text_target))
-        assertTrue(latestToast().contains("±16384"))
+        assertTrue(latestToast().contains("±99999"))
 
         // CLEAR (target scope) fixes it, then the latch can be switched off
         click(R.id.button_clear)
@@ -365,19 +365,19 @@ class FirstFragmentTest {
     }
 
     @Test
-    fun candidateBoundIsStrictlyLessThan256() {
-        type(2, 5, 6)
-        click(R.id.button_next) // 256 -> rejected
+    fun candidateBoundIsStrictlyLessThan1000() {
+        type(1, 0, 0, 0)
+        click(R.id.button_next) // 1000 -> rejected
         assertEquals("NUMBERS: (none)", text(R.id.text_numbers))
-        assertTrue(latestToast().contains("|x| < 256"))
+        assertTrue(latestToast().contains("|x| < 1000"))
 
         click(R.id.button_del)
-        click(R.id.button_next) // 25 -> fine
-        assertEquals("NUMBERS: 25", text(R.id.text_numbers))
+        click(R.id.button_next) // 100 -> fine
+        assertEquals("NUMBERS: 100", text(R.id.text_numbers))
 
-        type(2, 5, 5)
-        click(R.id.button_next) // 255 -> the largest allowed value
-        assertEquals("NUMBERS: 25, 255", text(R.id.text_numbers))
+        type(9, 9, 9)
+        click(R.id.button_next) // 999 -> the largest allowed value
+        assertEquals("NUMBERS: 100, 999", text(R.id.text_numbers))
     }
 
     @Test
@@ -522,16 +522,16 @@ class FirstFragmentTest {
     @Test
     fun targetRangeIsEnforced() {
         click(R.id.button_target)
-        type(1, 6, 3, 8, 4)
-        assertEquals("TARGET INPUT: 16384", text(R.id.text_current_input))
+        type(9, 9, 9, 9, 9)
+        assertEquals("TARGET INPUT: 99999", text(R.id.text_current_input))
         click(R.id.button_next)
-        assertEquals("TARGET: 16384", text(R.id.text_target)) // the bound itself is allowed
+        assertEquals("TARGET: 99999", text(R.id.text_target)) // the bound itself is allowed
 
-        type(1, 6, 3, 8, 5) // 16385 -> out of range (the buffer is empty after the commit above)
+        type(1, 0, 0, 0, 0, 0) // 100000 -> out of range (the buffer is empty after the commit above)
         click(R.id.button_next)
-        assertEquals("TARGET: 16384", text(R.id.text_target)) // unchanged
-        assertEquals("TARGET INPUT: 16385", text(R.id.text_current_input)) // kept for editing
-        assertTrue(latestToast().contains("±16384"))
+        assertEquals("TARGET: 99999", text(R.id.text_target)) // unchanged
+        assertEquals("TARGET INPUT: 100000", text(R.id.text_current_input)) // kept for editing
+        assertTrue(latestToast().contains("±99999"))
     }
 
     @Test
